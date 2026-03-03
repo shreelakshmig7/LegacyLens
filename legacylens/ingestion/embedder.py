@@ -22,6 +22,7 @@ Author: Shreelakshmi Gopinatha Rao
 Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
+import concurrent.futures
 import copy
 import logging
 import os
@@ -34,6 +35,7 @@ from legacylens.config.constants import (
     MAX_CHUNK_TOKENS,
     MAX_RETRIES,
     SENSITIVE_LOG_FIELDS,
+    VOYAGE_API_TIMEOUT_SECONDS,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,7 +60,7 @@ def _get_voyage_client():
     api_key = os.getenv("VOYAGE_API_KEY")
     if not api_key:
         raise ValueError("VOYAGE_API_KEY environment variable is not set")
-    return voyageai.Client(api_key=api_key)
+    return voyageai.Client(api_key=api_key, timeout=VOYAGE_API_TIMEOUT_SECONDS)
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +107,8 @@ def _embed_batch_with_retry(client, texts: List[str]) -> List[List[float]]:
 
     Implements exponential backoff: waits 2^attempt seconds between retries
     (1s after attempt 0, 2s after attempt 1, 4s after attempt 2).
+    Each attempt is capped at VOYAGE_API_TIMEOUT_SECONDS via a thread timeout
+    so a single API call never blocks the eval indefinitely.
 
     Args:
         client: Voyage AI client instance.
@@ -114,14 +118,29 @@ def _embed_batch_with_retry(client, texts: List[str]) -> List[List[float]]:
         list[list[float]]: Embedding vectors, one per input text.
 
     Raises:
-        Exception: Re-raises the last exception if all MAX_RETRIES attempts fail.
+        Exception: Re-raises the last exception if all MAX_RETRIES attempts fail,
+            or concurrent.futures.TimeoutError if the API does not respond in time.
     """
     last_exc: Exception = Exception("Unknown embedding error")
+    timeout_sec = VOYAGE_API_TIMEOUT_SECONDS
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = client.embed(texts, model=EMBEDDING_MODEL)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    lambda: client.embed(texts, model=EMBEDDING_MODEL),
+                )
+                response = future.result(timeout=timeout_sec)
             return response.embeddings
+        except concurrent.futures.TimeoutError as exc:
+            last_exc = exc
+            logger.warning(
+                "Embedding API timeout after %ds on attempt %d/%d — retrying",
+                timeout_sec,
+                attempt + 1,
+                MAX_RETRIES,
+            )
+            # No sleep on timeout; retry immediately (total wall time still bounded per attempt)
         except Exception as exc:
             last_exc = exc
             wait = 2 ** attempt

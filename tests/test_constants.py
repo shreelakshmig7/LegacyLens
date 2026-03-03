@@ -151,6 +151,23 @@ def test_metadata_fields_exist() -> None:
     assert required.issubset(set(METADATA_FIELDS))
 
 
+def test_reranker_and_query_expansion_constants_exist() -> None:
+    """Verify reranker and query expansion constants exist (PR 3 retrieval)."""
+    from legacylens.config.constants import (
+        LOGIC_QUERY_KEYWORDS,
+        QUERY_EXPANSION_TERMS,
+        RERANK_DATA_DEPRIORITIZE_WEIGHT,
+        RERANK_PARAGRAPH_BOOST_WEIGHT,
+    )
+
+    assert isinstance(RERANK_PARAGRAPH_BOOST_WEIGHT, (int, float))
+    assert isinstance(RERANK_DATA_DEPRIORITIZE_WEIGHT, (int, float))
+    assert isinstance(LOGIC_QUERY_KEYWORDS, list)
+    assert isinstance(QUERY_EXPANSION_TERMS, dict)
+    assert "explain" in LOGIC_QUERY_KEYWORDS
+    assert "entry point" in QUERY_EXPANSION_TERMS
+
+
 # ---------------------------------------------------------------------------
 # Environment-backed constant tests
 # ---------------------------------------------------------------------------
@@ -260,7 +277,7 @@ def test_chunk_types_are_distinct() -> None:
 
 
 def test_ingestion_batch_size_updated() -> None:
-    """INGESTION_BATCH_SIZE must be 200 to halve API round-trips for ~6,700 chunks."""
+    """INGESTION_BATCH_SIZE must be 300 to reduce API round-trips and meet the 5-minute gate."""
     from legacylens.config.constants import INGESTION_BATCH_SIZE
 
-    assert INGESTION_BATCH_SIZE == 200
+    assert INGESTION_BATCH_SIZE == 300

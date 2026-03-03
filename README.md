@@ -98,6 +98,8 @@ All values must show `"success": True` before running the application.
 
 ## Running the application
 
+Activate the venv first (`source .venv/bin/activate`), then:
+
 ```bash
 # Start the FastAPI backend
 uvicorn legacylens.api.main:app --reload
@@ -110,6 +112,8 @@ streamlit run legacylens/ui/app.py
 
 ## Running tests
 
+With the venv activated:
+
 ```bash
 python -m pytest tests/ -v
 ```
@@ -120,12 +124,19 @@ Test results are saved to `tests/results/`.
 
 ## Running the evaluation benchmark
 
+**Always run eval inside the virtual environment.** Running with system Python will fail (e.g. `No module named 'chromadb'`). Never run any LegacyLens command outside the venv.
+
 ```bash
-python eval/run_eval.py
+source .venv/bin/activate && python3 -m eval.run_eval --fast
 ```
 
-This runs all 20 golden test cases and writes a timestamped results file to `tests/results/`.  
-Run after every new feature. Fix any regressions before moving on.
+Use `--fast` to run only the 6 mandatory cases (ll-001 through ll-006). For the full 20-case benchmark:
+
+```bash
+source .venv/bin/activate && python3 -m eval.run_eval
+```
+
+Results are written to `tests/results/`. Run after every new feature and fix any regressions before moving on.
 
 ---
 
