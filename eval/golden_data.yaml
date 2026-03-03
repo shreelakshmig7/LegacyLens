@@ -1,0 +1,350 @@
+# golden_data.yaml
+# -----------------
+# LegacyLens — RAG System for Legacy Enterprise Codebases — Evaluation benchmark
+# -------------------------------------------------------------------------------
+# 20 golden Q&A pairs used to measure retrieval precision and answer quality.
+#
+# IMPORTANT: expected_chunks contain placeholder file paths and paragraph names.
+# These must be updated in PR 2 once the target repository (OpenCOBOL Contrib) has
+# been cloned, analysed, and a specific commit pinned.
+#
+# Categories:
+#   happy_path     — standard queries any working RAG system should handle
+#   structural     — division/section-level navigation
+#   dependency     — CALL/COPY/USING cross-file reasoning
+#   edge_case      — dead code, missing copybooks, ambiguous input
+#   business_logic — extraction of embedded business rules
+#
+# Difficulty levels:
+#   easy   — single-file, single-paragraph answer
+#   medium — requires context from 2-3 chunks or cross-section reasoning
+#   hard   — requires cross-file dependency chain or DATA DIVISION cross-reference
+#
+# Author: Shreelakshmi Gopinatha Rao
+# Project: LegacyLens — RAG System for Legacy Enterprise Codebases
+
+test_cases:
+
+  # ── Happy Path (mandatory anchors, ll-001 through ll-006) ──────────────────
+
+  - id: "ll-001"
+    category: "happy_path"
+    query: "Where is the main entry point of this program?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. MAIN-ENTRY or PROGRAM-BEGIN"
+    must_contain:
+      - "file path"
+      - "line number"
+      - "paragraph"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+      - "hallucinated"
+    difficulty: "easy"
+
+  - id: "ll-002"
+    category: "happy_path"
+    query: "What functions modify the CUSTOMER-RECORD?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. UPDATE-CUSTOMER or WRITE-CUSTOMER"
+    must_contain:
+      - "CUSTOMER-RECORD"
+      - "paragraph"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  - id: "ll-003"
+    category: "happy_path"
+    query: "Explain what the CALCULATE-INTEREST paragraph does"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "CALCULATE-INTEREST"
+    must_contain:
+      - "interest"
+      - "paragraph"
+      - "line number"
+      - "file path"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "easy"
+
+  - id: "ll-004"
+    category: "happy_path"
+    query: "Find all file I/O operations"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. OPEN-FILES or READ-INPUT-FILE"
+    must_contain:
+      - "OPEN"
+      - "READ"
+      - "WRITE"
+      - "file"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  - id: "ll-005"
+    category: "happy_path"
+    query: "What are the dependencies of MODULE-X?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "CALL"
+      - "dependency"
+      - "module"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  - id: "ll-006"
+    category: "happy_path"
+    query: "Show me error handling patterns in this codebase"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. HANDLE-ERROR or ERROR-ROUTINE"
+    must_contain:
+      - "error"
+      - "paragraph"
+      - "line number"
+    must_not_contain:
+      - "I cannot help"
+      - "hallucinated"
+    difficulty: "medium"
+
+  # ── Structural queries (ll-007 through ll-010) ─────────────────────────────
+
+  - id: "ll-007"
+    category: "structural"
+    query: "What sections are defined in the PROCEDURE DIVISION?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — PROCEDURE DIVISION header"
+    must_contain:
+      - "PROCEDURE DIVISION"
+      - "section"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "easy"
+
+  - id: "ll-008"
+    category: "structural"
+    query: "What variables are declared in the WORKING-STORAGE SECTION?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — WORKING-STORAGE SECTION"
+    must_contain:
+      - "WORKING-STORAGE"
+      - "variable"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "easy"
+
+  - id: "ll-009"
+    category: "structural"
+    query: "How is the FILE SECTION structured in the DATA DIVISION?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — FILE SECTION"
+    must_contain:
+      - "FILE SECTION"
+      - "DATA DIVISION"
+      - "FD"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "easy"
+
+  - id: "ll-010"
+    category: "structural"
+    query: "List all paragraph names in the main program file"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "paragraph"
+      - "line number"
+      - "file path"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  # ── Dependency queries (ll-011 through ll-014) ─────────────────────────────
+
+  - id: "ll-011"
+    category: "dependency"
+    query: "Which programs does this codebase CALL externally?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "CALL"
+      - "program"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  - id: "ll-012"
+    category: "dependency"
+    query: "What copybooks are included via COPY statements?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "COPY"
+      - "copybook"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "easy"
+
+  - id: "ll-013"
+    category: "dependency"
+    query: "Which paragraphs pass parameters using USING clauses?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "USING"
+      - "parameter"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "medium"
+
+  - id: "ll-014"
+    category: "dependency"
+    query: "Trace the full call chain starting from the main entry point"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "CALL"
+      - "entry"
+      - "chain"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"
+
+  # ── Edge cases (ll-015 through ll-018) ─────────────────────────────────────
+
+  - id: "ll-015"
+    category: "edge_case"
+    query: "Are there any dead code sections that are never called?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "paragraph"
+      - "line number"
+    must_not_contain:
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"
+
+  - id: "ll-016"
+    category: "edge_case"
+    query: "What happens when the input file is missing?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "file"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"
+
+  - id: "ll-017"
+    category: "edge_case"
+    query: "Show me variables defined in copybooks that are used in the main program"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD"
+    must_contain:
+      - "copybook"
+      - "variable"
+      - "COPY"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"
+
+  - id: "ll-018"
+    category: "edge_case"
+    query: "xyzzy gibberish paragraph does not exist"
+    expected_chunks: []
+    must_contain:
+      - "not found"
+    must_not_contain:
+      - "xyzzy"
+      - "hallucinated"
+    difficulty: "easy"
+
+  # ── Business logic queries (ll-019 through ll-020) ─────────────────────────
+
+  - id: "ll-019"
+    category: "business_logic"
+    query: "What business rules govern the interest calculation logic?"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. CALCULATE-INTEREST"
+    must_contain:
+      - "interest"
+      - "rule"
+      - "paragraph"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"
+
+  - id: "ll-020"
+    category: "business_logic"
+    query: "Explain the validation rules applied to customer input data"
+    expected_chunks:
+      - file_path: "TBD — update in PR 2 after repo clone"
+        paragraph_name: "TBD — e.g. VALIDATE-INPUT or EDIT-CUSTOMER-DATA"
+    must_contain:
+      - "validation"
+      - "customer"
+      - "line number"
+    must_not_contain:
+      - "I don't know"
+      - "I cannot help"
+      - "error"
+    difficulty: "hard"

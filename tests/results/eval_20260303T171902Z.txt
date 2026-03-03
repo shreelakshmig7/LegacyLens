@@ -1,0 +1,41 @@
+LegacyLens Eval — 20260303T171902Z
+Total: 20  Passed: 3  Failed: 17
+
+[FAIL] ll-001
+  missing: ['file path', 'line number', 'paragraph']
+[FAIL] ll-002
+  missing: ['paragraph', 'line number']
+[FAIL] ll-003
+  missing: ['line number', 'file path']
+[FAIL] ll-004
+  missing: ['OPEN', 'READ', 'WRITE']
+[FAIL] ll-005
+  missing: ['CALL', 'dependency']
+[FAIL] ll-006
+  missing: ['paragraph', 'line number']
+[PASS] ll-007
+[FAIL] ll-008
+  missing: ['line number']
+[FAIL] ll-009
+  missing: ['FD']
+[FAIL] ll-010
+  missing: ['line number', 'file path']
+[FAIL] ll-011
+  missing: ['line number']
+[FAIL] ll-012
+  missing: ['line number']
+[FAIL] ll-013
+  missing: ['line number']
+[PASS] ll-014
+[FAIL] ll-015
+  missing: ['paragraph', 'line number']
+[FAIL] ll-016
+  missing: ['line number']
+[PASS] ll-017
+[FAIL] ll-018
+  missing: ['not found']
+  forbidden: ['xyzzy']
+[FAIL] ll-019
+  missing: ['paragraph', 'line number']
+[FAIL] ll-020
+  missing: ['line number']

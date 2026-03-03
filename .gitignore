@@ -1,0 +1,52 @@
+# LegacyLens — .gitignore
+
+# ── Secrets — NEVER commit ────────────────────────────────────────────────────
+.env
+
+# ── ChromaDB persisted data ───────────────────────────────────────────────────
+chroma_db/
+*.chroma
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Testing & coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+*.lcov
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Target codebase clone (ingested locally, not committed) ───────────────────
+data/
+repos/
