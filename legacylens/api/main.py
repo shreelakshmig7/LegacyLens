@@ -305,7 +305,8 @@ def _run_ingestion_background(clone_dest: str) -> None:
     try:
         repo_owner = os.getenv("REPO_OWNER", "shreelakshmig7")
         repo_name = os.getenv("REPO_NAME", "gnucobol-contrib")
-        ref = os.getenv("REPO_COMMIT", "master")
+        # Use branch name for ZIP download — REPO_COMMIT is for deep links only, not for GitHub ZIP URLs.
+        ref = os.getenv("REPO_BRANCH", "master")
 
         if not Path(clone_dest).exists():
             _download_and_extract_repo(repo_owner, repo_name, ref, clone_dest)
