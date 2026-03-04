@@ -292,10 +292,38 @@ def _download_and_extract_repo(repo_owner: str, repo_name: str, ref: str, dest: 
         raise FileNotFoundError(f"Extracted path not found: {extracted_path}")
 
 
+_FILE_BATCH_SIZE = 80  # Files per batch — keeps memory well below 1 GB Railway limit
+
+
+def _already_ingested_paths() -> set:
+    """
+    Query ChromaDB for file_path metadata values already ingested.
+    Returns a set of file paths so resume logic can skip completed files.
+
+    Returns:
+        set[str]: File paths already present in ChromaDB.
+    """
+    try:
+        from legacylens.retrieval.vector_store import _get_collection
+        collection = _get_collection()
+        total = collection.count()
+        if total == 0:
+            return set()
+        raw = collection.get(include=["metadatas"], limit=min(total, 200000))
+        paths = {(m or {}).get("file_path", "") for m in (raw.get("metadatas") or []) if m}
+        logger.info("[ingest] ChromaDB: %d chunks, %d unique file paths already ingested.", total, len(paths))
+        return paths
+    except Exception as exc:
+        logger.warning("[ingest] Could not query existing paths (treating as empty): %s", exc)
+        return set()
+
+
 def _run_ingestion_background(clone_dest: str) -> None:
     """
-    Download gnucobol-contrib ZIP from GitHub and run the full ingestion pipeline in a background thread.
-    Uses httpx (no git binary required). Writes progress to Railway logs.
+    Download gnucobol-contrib ZIP (no git required), then ingest in batches of _FILE_BATCH_SIZE files.
+    Each batch is chunked → embedded → inserted to ChromaDB immediately.
+    Resume-safe: already-ingested file paths are detected from ChromaDB on startup,
+    so restarting picks up where it left off without re-processing completed files.
 
     Args:
         clone_dest: Absolute path where the repo will be extracted.
@@ -305,29 +333,73 @@ def _run_ingestion_background(clone_dest: str) -> None:
     try:
         repo_owner = os.getenv("REPO_OWNER", "shreelakshmig7")
         repo_name = os.getenv("REPO_NAME", "gnucobol-contrib")
-        # Use branch name for ZIP download — REPO_COMMIT is for deep links only, not for GitHub ZIP URLs.
         ref = os.getenv("REPO_BRANCH", "master")
 
         if not Path(clone_dest).exists():
             _download_and_extract_repo(repo_owner, repo_name, ref, clone_dest)
         else:
-            logger.info("[ingest] Repo already present at %s — skipping download.", clone_dest)
+            logger.info("[ingest] Repo already at %s — skipping download.", clone_dest)
 
         os.environ["REPO_PATH"] = clone_dest
-        logger.info("[ingest] REPO_PATH set to %s. Starting ingestion pipeline...", clone_dest)
 
-        from legacylens.ingestion.runner import run_ingestion
-        result = run_ingestion(clone_dest)
-        _ingest_state["last_result"] = result
-        if result.get("success"):
-            data = result.get("data") or {}
-            logger.info(
-                "[ingest] SUCCESS — %d chunks stored, %d files.",
-                data.get("chunks_embedded", 0),
-                data.get("files_discovered", 0),
-            )
-        else:
-            logger.error("[ingest] FAILED — %s", result.get("error"))
+        from legacylens.ingestion.file_discovery import discover_files
+        from legacylens.ingestion.chunker import chunk_file
+        from legacylens.ingestion.embedder import embed_chunks
+        from legacylens.ingestion.reference_scraper import attach_dependencies
+        from legacylens.retrieval.vector_store import insert_chunks
+
+        disc = discover_files(clone_dest)
+        if not disc.get("success"):
+            raise RuntimeError(f"File discovery failed: {disc.get('error')}")
+        all_files = disc["data"]["files"]
+        logger.info("[ingest] Discovered %d files.", len(all_files))
+
+        ingested = _already_ingested_paths()
+        remaining = [f for f in all_files if f not in ingested]
+        logger.info("[ingest] To process: %d files (%d already done).", len(remaining), len(ingested))
+
+        total_stored = 0
+        n_batches = max(1, (len(remaining) + _FILE_BATCH_SIZE - 1) // _FILE_BATCH_SIZE)
+
+        for idx in range(n_batches):
+            batch = remaining[idx * _FILE_BATCH_SIZE:(idx + 1) * _FILE_BATCH_SIZE]
+            logger.info("[ingest] Batch %d/%d — %d files...", idx + 1, n_batches, len(batch))
+
+            chunks: list = []
+            for fp in batch:
+                r = chunk_file(fp)
+                if r.get("success"):
+                    chunks.extend(r["data"]["chunks"])
+
+            if not chunks:
+                logger.info("[ingest] Batch %d: no chunks — skipping.", idx + 1)
+                continue
+
+            dep = attach_dependencies(chunks)
+            if dep.get("success"):
+                chunks = dep["data"]["chunks"]
+
+            emb = embed_chunks(chunks)
+            if not emb.get("success"):
+                logger.error("[ingest] Batch %d: embed failed — %s", idx + 1, emb.get("error"))
+                continue
+            embedded = emb["data"]["chunks"]
+
+            ins = insert_chunks(embedded, clone_dest)
+            if ins.get("success"):
+                n = ins["data"]["inserted_count"]
+                total_stored += n
+                logger.info("[ingest] Batch %d/%d: +%d chunks (total: %d).", idx + 1, n_batches, n, total_stored)
+            else:
+                logger.error("[ingest] Batch %d: insert failed — %s", idx + 1, ins.get("error"))
+
+        logger.info("[ingest] === COMPLETE — %d total chunks stored ===", total_stored)
+        _ingest_state["last_result"] = {
+            "success": True,
+            "total_stored": total_stored,
+            "files_discovered": len(all_files),
+            "files_processed": len(remaining),
+        }
     except Exception as exc:
         logger.exception("[ingest] Ingestion failed: %s", exc)
         _ingest_state["last_result"] = {"success": False, "error": str(exc)}
