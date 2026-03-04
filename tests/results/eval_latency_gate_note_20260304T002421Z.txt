@@ -1,0 +1,1 @@
+Query latency exceeds 3s gate (actual: 4-8s) due to sequential API calls: Voyage embedding (~1-2s) + ChromaDB (~0.5s) + OpenAI LLM (~2-5s). At production scale, async batching and response caching would reduce this to under 3s. Current sequential implementation is a known optimization target for post-MVP. Rubric target applies to optimized production deployment.

@@ -140,6 +140,13 @@ test_cases:
     # This IS an error handling pattern: it maps every SQLSTATE code to a human-readable message.
     # UPDATE-RECORD was removed — it modifies customer data, not an error handling pattern.
     # worldcities5 SQL-ERROR does not make top-5 even with expansion tuning.
+    #
+    # KNOWN LIMITATION (PR 4): This case cannot reliably pass the must_contain check for
+    # "paragraph" and "line number" because STATETXT.cpy is a DATA copybook — it contains
+    # SQLSTATE code-to-text mappings structured as data definitions, not PROCEDURE DIVISION
+    # paragraphs. The LLM correctly describes it as a data structure, but "paragraph" is
+    # architecturally absent from copybook files. A future improvement could expand retrieval
+    # to surface PROCEDURE chunks that call STATETXT.cpy alongside it.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy"
         paragraph_name: ""
@@ -251,6 +258,10 @@ test_cases:
       - "error"
     difficulty: "easy"
 
+  # KNOWN LIMITATION (PR 4): The correct chunk's relevance score falls below
+  # NOT_FOUND_SCORE_THRESHOLD (0.55) so the fast-path triggers and the LLM is never
+  # called. Query expansion to boost the score caused retrieval regressions. Addressed
+  # post-MVP via per-query threshold tuning or score calibration.
   - id: "ll-013"
     category: "dependency"
     query: "Which paragraphs pass parameters using USING clauses?"
@@ -304,6 +315,13 @@ test_cases:
   - id: "ll-016"
     category: "edge_case"
     query: "What happens when the input file is missing?"
+    # KNOWN LIMITATION (PR 4): This case cannot reliably pass both constraints simultaneously.
+    # The must_not_contain check forbids the word "error", but the code describing file-not-found
+    # behavior (FILE STATUS codes, INVALID KEY conditions, OPEN failure handling) inherently
+    # requires "error" language to be accurate. The LLM correctly describes the code but the
+    # forbidden-term check is too broad for this category of query. A future improvement could
+    # refine must_not_contain to only forbid system-level error messages (e.g., "I cannot help")
+    # rather than the word "error" in general — which is a valid COBOL concept here.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/tools/cntlines/cntlines.cbl"
         paragraph_name: ""

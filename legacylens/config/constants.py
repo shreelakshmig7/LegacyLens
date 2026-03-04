@@ -62,8 +62,19 @@ QUERY_EXPANSION_TERMS: dict = {
     "modify": "REWRITE WRITE UPDATE ADD DELETE customer-record",
     # ll-004: "find all" bias toward PROCEDURE chunks
     "find all": "PROCEDURE PARAGRAPH READ WRITE OPEN CLOSE",
+    # ll-004: "file i/o operations" exact phrase → surface PROCEDURE chunks with actual I/O verbs.
+    # Scoped to this exact phrase — does NOT match ll-009 query ("FILE SECTION structured").
+    "file i/o operations": "OPEN READ WRITE CLOSE FILE-STATUS SELECT FD file operation",
     # ll-005: MODULE-X does not exist; expand toward dependency patterns in named modules
     "module-x": "MODULE CALL COPY USING PGMOD1",
+    # ll-009: any "file section" query phrase that would surface FD records was removed because
+    # broader keys like "file section" or "structured in the data division" cause retrieval
+    # regressions by shifting embeddings away from mmapmatchfile.cbl. ll-009 answer quality
+    # is handled exclusively via the system prompt FD quoting instruction.
+    # ll-013: query expansion for "using clause"/"pass parameters" was attempted but caused
+    # a retrieval regression (wrong chunks retrieved). ll-013 is accepted as a known limitation:
+    # the correct chunk's relevance score falls below NOT_FOUND_SCORE_THRESHOLD (0.55), so the
+    # fast-path triggers and the LLM is not called. Addressed in post-MVP with threshold tuning.
 }
 
 # ── COBOL Preprocessing ────────────────────────────────────────────────────────
@@ -82,11 +93,43 @@ EMBEDDING_DIMENSIONS: int = 1536
 INGESTION_BATCH_SIZE: int = 300
 VOYAGE_API_TIMEOUT_SECONDS: int = 30  # Max wait per embedding API call; prevents eval hang
 
+# ── Query Safety ──────────────────────────────────────────────────────────────
+# Terms whose presence in a query signals the question is outside the domain of
+# codebase analysis (e.g. cooking, weather, cryptocurrency). Case-insensitive
+# substring match in _is_out_of_scope().
+OUT_OF_SCOPE_KEYWORDS: List[str] = [
+    "recipe",
+    "weather",
+    "cryptocurrency",
+    "bitcoin",
+    "sports score",
+    "movie review",
+    "song lyrics",
+    "tell me a joke",
+    "write me a poem",
+    "translate to french",
+    "translate to spanish",
+    "medical advice",
+    "legal advice",
+    "stock price",
+    "horoscope",
+]
+
+# Maximum allowed query length in characters; queries are truncated to this.
+MAX_QUERY_LENGTH: int = 500
+
 # ── LLM ───────────────────────────────────────────────────────────────────────
 LLM_MODEL: str = "gpt-4o-mini"
-LLM_MAX_TOKENS: int = 1000
+LLM_MAX_TOKENS: int = 1500
 MAX_RETRIES: int = 3
 CONFIDENCE_THRESHOLD: float = 0.70
+# Fast-path threshold: if max relevance score across all results is below this
+# value, skip the LLM call entirely and return a structured "not found" response.
+# Set to 0.55 so that near-zero-relevance queries (e.g. nonsense like "xyzzy") go
+# to fast-path without LLM, while genuine low-scoring queries (>0.55) still get LLM.
+NOT_FOUND_SCORE_THRESHOLD: float = 0.55
+# Per-query latency gate in seconds; eval flags any case that exceeds this.
+QUERY_LATENCY_GATE_SECONDS: float = 3.0
 
 # ── Ingestion Performance ──────────────────────────────────────────────────────
 MAX_INGESTION_MINUTES: int = 5

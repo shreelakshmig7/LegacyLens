@@ -1,0 +1,46 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 36 items
+
+tests/test_answer_generator.py::TestAnswerGeneratorImports::test_module_importable PASSED [  2%]
+tests/test_answer_generator.py::TestAnswerGeneratorImports::test_public_api_exists PASSED [  5%]
+tests/test_answer_generator.py::TestParseLineRange::test_bare_integer_string PASSED [  8%]
+tests/test_answer_generator.py::TestParseLineRange::test_empty_string PASSED [ 11%]
+tests/test_answer_generator.py::TestParseLineRange::test_invalid_string PASSED [ 13%]
+tests/test_answer_generator.py::TestParseLineRange::test_none_input PASSED [ 16%]
+tests/test_answer_generator.py::TestParseLineRange::test_single_element_list PASSED [ 19%]
+tests/test_answer_generator.py::TestParseLineRange::test_standard_list_string PASSED [ 22%]
+tests/test_answer_generator.py::TestParseLineRange::test_zero_padded PASSED [ 25%]
+tests/test_answer_generator.py::TestBuildGithubLink::test_line_number_appears_in_link PASSED [ 27%]
+tests/test_answer_generator.py::TestBuildGithubLink::test_link_falls_back_to_anchor PASSED [ 30%]
+tests/test_answer_generator.py::TestBuildGithubLink::test_link_with_empty_env PASSED [ 33%]
+tests/test_answer_generator.py::TestBuildGithubLink::test_link_with_repo_path_prefix PASSED [ 36%]
+tests/test_answer_generator.py::TestFormatContextBlock::test_contains_assembled_context PASSED [ 38%]
+tests/test_answer_generator.py::TestFormatContextBlock::test_contains_file_path PASSED [ 41%]
+tests/test_answer_generator.py::TestFormatContextBlock::test_contains_line_number PASSED [ 44%]
+tests/test_answer_generator.py::TestFormatContextBlock::test_contains_paragraph_name PASSED [ 47%]
+tests/test_answer_generator.py::TestFormatContextBlock::test_empty_paragraph_omitted_gracefully PASSED [ 50%]
+tests/test_answer_generator.py::TestGenerateAnswerFastPath::test_above_threshold_calls_llm PASSED [ 52%]
+tests/test_answer_generator.py::TestGenerateAnswerFastPath::test_fast_path_answer_contains_structural_terms PASSED [ 55%]
+tests/test_answer_generator.py::TestGenerateAnswerFastPath::test_fast_path_does_not_echo_query_term PASSED [ 58%]
+tests/test_answer_generator.py::TestGenerateAnswerFastPath::test_fast_path_returns_not_found PASSED [ 61%]
+tests/test_answer_generator.py::TestGenerateAnswerContract::test_empty_results_list PASSED [ 63%]
+tests/test_answer_generator.py::TestGenerateAnswerContract::test_error_key_absent_on_success PASSED [ 66%]
+tests/test_answer_generator.py::TestGenerateAnswerContract::test_success_false_on_llm_exception PASSED [ 69%]
+tests/test_answer_generator.py::TestGenerateAnswerContract::test_success_true_on_happy_path PASSED [ 72%]
+tests/test_answer_generator.py::TestGenerateAnswerStream::test_returns_generator PASSED [ 75%]
+tests/test_answer_generator.py::TestGenerateAnswerStream::test_stream_fast_path_yields_not_found PASSED [ 77%]
+tests/test_answer_generator.py::TestGenerateAnswerStream::test_stream_yields_strings PASSED [ 80%]
+tests/test_answer_generator.py::TestExponentialBackoff::test_no_retry_on_non_transient_error PASSED [ 83%]
+tests/test_answer_generator.py::TestExponentialBackoff::test_raises_after_max_retries PASSED [ 86%]
+tests/test_answer_generator.py::TestExponentialBackoff::test_retries_on_failure_then_succeeds PASSED [ 88%]
+tests/test_answer_generator.py::TestConstantsUsage::test_answer_generator_imports_llm_model_from_constants PASSED [ 91%]
+tests/test_answer_generator.py::TestConstantsUsage::test_llm_max_tokens_updated PASSED [ 94%]
+tests/test_answer_generator.py::TestConstantsUsage::test_not_found_threshold_constant_exists PASSED [ 97%]
+tests/test_answer_generator.py::TestConstantsUsage::test_query_latency_gate_exists PASSED [100%]
+
+============================== 36 passed in 1.09s ==============================

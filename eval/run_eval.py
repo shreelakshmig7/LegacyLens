@@ -23,10 +23,13 @@ import argparse
 import logging
 import os
 import pathlib
+import time
 from datetime import datetime
 from typing import Any, Dict, List
 
 import yaml
+
+from legacylens.config.constants import QUERY_LATENCY_GATE_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -230,9 +233,18 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
         retrieval_results: List[Dict[str, Any]] = []
         answer_results: List[Dict[str, Any]] = []
 
+        try:
+            from legacylens.generation.answer_generator import generate_answer
+        except ImportError as exc:
+            logger.error("answer_generator import failed: %s", exc)
+            return {"success": False, "error": str(exc), "total": 0, "retrieval_precision_pct": 0.0}
+
+        latency_warnings: List[str] = []
+
         for tc in test_cases:
             print(f"Starting {tc['id']}...", flush=True)
             query = tc.get("query") or ""
+            case_start = time.monotonic()
 
             # Retrieval: search → rerank → assemble
             search_out = search(query)
@@ -268,23 +280,32 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
             ret_score = score_retrieval_precision(tc, reranked)
             retrieval_results.append(ret_score)
 
-            # Answer: stub until PR 4
-            answer = (
-                "[STUB] Answer generation in PR 4. "
-                f"Query: {query}. "
-                f"Retrieved {len(reranked)} chunks."
-            )
+            # Answer generation (PR 4 — real LLM call)
+            gen_result = generate_answer(query, assembled)
+            answer = gen_result.get("answer", "") if gen_result.get("success") else ""
+            if not gen_result.get("success"):
+                logger.warning("[%s] answer_generator failed: %s", tc["id"], gen_result.get("error"))
+            print("  answer_generator done", flush=True)
+
             ans_score = score_answer(tc, answer)
             answer_results.append(ans_score)
+
+            # Latency gate
+            elapsed = time.monotonic() - case_start
+            if elapsed > QUERY_LATENCY_GATE_SECONDS:
+                warn_msg = f"{tc['id']} exceeded latency gate: {elapsed:.2f}s > {QUERY_LATENCY_GATE_SECONDS}s"
+                latency_warnings.append(warn_msg)
+                logger.warning("LATENCY GATE: %s", warn_msg)
 
             ret_status = "PASS" if ret_score["passed"] else "FAIL"
             ans_status = "PASS" if ans_score["passed"] else "FAIL"
             logger.info(
-                "[%s ret / %s ans] %s — %s",
+                "[%s ret / %s ans] %s — %s (%.2fs)",
                 ret_status,
                 ans_status,
                 tc["id"],
                 tc["query"][:50],
+                elapsed,
             )
 
         total = len(test_cases)
@@ -296,11 +317,19 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
         results_path = _RESULTS_DIR / f"eval_{timestamp}.txt"
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+        answer_precision_pct = (answer_passed / total * 100.0) if total else 0.0
+        latency_ok = len(latency_warnings) == 0
+
         with open(results_path, "w", encoding="utf-8") as fh:
             fh.write(f"LegacyLens Eval — {timestamp}\n")
             fh.write(f"Total: {total}\n")
             fh.write(f"Retrieval Precision: {retrieval_passed}/{total} ({retrieval_precision_pct:.1f}%) — target >70%\n")
-            fh.write(f"Answer Faithfulness (stub): {answer_passed}/{total}\n\n")
+            fh.write(f"Answer Faithfulness: {answer_passed}/{total} ({answer_precision_pct:.1f}%) — target >70%\n")
+            fh.write(f"Latency Gate ({QUERY_LATENCY_GATE_SECONDS}s): {'PASS' if latency_ok else 'FAIL'}\n")
+            if latency_warnings:
+                for w in latency_warnings:
+                    fh.write(f"  LATENCY WARN: {w}\n")
+            fh.write("\n")
             for i, tc in enumerate(test_cases):
                 ret = retrieval_results[i]
                 ans = answer_results[i]
@@ -316,19 +345,26 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
                     fh.write(f"  answer forbidden: {ans['forbidden_terms']}\n")
 
         logger.info(
-            "Eval complete. Retrieval: %d/%d (%.1f%%). Results: %s",
+            "Eval complete. Retrieval: %d/%d (%.1f%%). Answer: %d/%d (%.1f%%). Latency gate: %s. Results: %s",
             retrieval_passed,
             total,
             retrieval_precision_pct,
+            answer_passed,
+            total,
+            answer_precision_pct,
+            "PASS" if latency_ok else "FAIL",
             results_path,
         )
 
         return {
-            "success": retrieval_precision_pct >= 70.0,
+            "success": retrieval_precision_pct >= 70.0 and answer_precision_pct >= 70.0,
             "total": total,
             "retrieval_precision_pct": retrieval_precision_pct,
             "retrieval_passed": retrieval_passed,
             "answer_passed": answer_passed,
+            "answer_precision_pct": answer_precision_pct,
+            "latency_gate_ok": latency_ok,
+            "latency_warnings": latency_warnings,
             "results": [{"retrieval": r, "answer": a} for r, a in zip(retrieval_results, answer_results)],
             "results_path": str(results_path),
         }
@@ -357,5 +393,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     summary = run_eval(fast=args.fast)
     print(f"\nResult: {'PASS' if summary.get('success') else 'FAIL'}")
-    print(f"Retrieval: {summary.get('retrieval_passed', 0)}/{summary.get('total', 0)} ({summary.get('retrieval_precision_pct', 0):.1f}%)")
-    print(f"Answer (stub): {summary.get('answer_passed', 0)}/{summary.get('total', 0)}")
+    print(f"Retrieval:  {summary.get('retrieval_passed', 0)}/{summary.get('total', 0)} ({summary.get('retrieval_precision_pct', 0):.1f}%) — target >70%")
+    print(f"Answer:     {summary.get('answer_passed', 0)}/{summary.get('total', 0)} ({summary.get('answer_precision_pct', 0):.1f}%) — target >70%")
+    print(f"Latency gate ({QUERY_LATENCY_GATE_SECONDS}s): {'PASS' if summary.get('latency_gate_ok', True) else 'FAIL'}")
+    if summary.get("latency_warnings"):
+        for w in summary["latency_warnings"]:
+            print(f"  LATENCY WARN: {w}")
+    if summary.get("results_path"):
+        print(f"Results saved: {summary['results_path']}")

@@ -201,7 +201,7 @@ def run_ingestion(repo_path: str) -> dict:
         }
 
     files = disc_result["data"]["files"]
-    total_loc = disc_result["data"]["total_loc"]
+    total_loc = disc_result["data"]["total_lines"]
     logger.info(
         "Discovered %d files, %d LOC in %.1fs",
         len(files),
