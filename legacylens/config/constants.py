@@ -17,7 +17,7 @@ Key constants:
     MAX_CHUNK_TOKENS, CHUNK_OVERLAP_TOKENS                   — chunking parameters
     EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, INGESTION_BATCH_SIZE
     LLM_MODEL, LLM_MAX_TOKENS, MAX_RETRIES
-    CHROMA_PERSIST_DIR, REPO_BASE_URL                        — deployment config
+    CHROMA_PERSIST_DIR, REPO_BASE_URL, LEGACYLENS_API_URL    — deployment / UI config
     CHUNK_TYPE_PROCEDURE, CHUNK_TYPE_DATA, CHUNK_TYPE_COPYBOOK — chunk type values
     validate_required_env_vars()                             — startup env guard
 
@@ -133,6 +133,9 @@ QUERY_LATENCY_GATE_SECONDS: float = 3.0
 
 # ── Ingestion Performance ──────────────────────────────────────────────────────
 MAX_INGESTION_MINUTES: int = 5
+
+# ── UI / API base URL (Streamlit calls FastAPI) ──────────────────────────────────
+LEGACYLENS_API_URL: str = os.getenv("LEGACYLENS_API_URL", "http://localhost:8000")
 
 # ── Repository — sourced from environment so no values are hardcoded ───────────
 REPO_BASE_URL: str = "https://github.com/{owner}/{repo}/blob/{commit}/{file_path}#L{line}"

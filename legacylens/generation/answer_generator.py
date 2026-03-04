@@ -665,7 +665,7 @@ def generate_answer_stream(
 
     Yields:
         str: Individual text tokens. On failure yields a single error string
-             prefixed with "[ERROR]" so callers can detect it.
+             prefixed with "__ERROR__" so callers can detect it (same pattern as __STATUS__).
     """
     try:
         query = _sanitize_query(query)
@@ -691,4 +691,4 @@ def generate_answer_stream(
 
     except Exception as exc:
         logger.error("generate_answer_stream failed for query '%.60s': %s", query, exc)
-        yield f"[ERROR] Answer generation failed: {exc}"
+        yield f"__ERROR__Answer generation failed: {exc}"
