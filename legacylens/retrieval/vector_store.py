@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 # Whitelisted metadata filter fields — only these may appear in ChromaDB where-filters
 _ALLOWED_FILTER_FIELDS = frozenset(
-    {"file_path", "type", "parent_section", "paragraph_name"}
+    {"file_path", "file_name", "type", "parent_section", "paragraph_name"}
 )
 
 # Characters that must be stripped from string metadata values before storage
@@ -236,6 +236,7 @@ def insert_chunks(
 
             raw_meta = {
                 "file_path": chunk.get("file_path", ""),
+                "file_name": chunk.get("file_name", ""),
                 "line_range": str(chunk.get("line_range", [0, 0])),
                 "type": chunk.get("type", ""),
                 "parent_section": chunk.get("parent_section", ""),

@@ -151,6 +151,7 @@ DATA_XREF_MAX_CHUNKS: int = 100   # Max DATA chunks to fetch per file for variab
 # ── Metadata Schema Fields ─────────────────────────────────────────────────────
 METADATA_FIELDS: List[str] = [
     "file_path",
+    "file_name",
     "line_range",
     "type",
     "parent_section",
@@ -162,6 +163,22 @@ METADATA_FIELDS: List[str] = [
 CHUNK_TYPE_PROCEDURE: str = "PROCEDURE"
 CHUNK_TYPE_DATA: str = "DATA"
 CHUNK_TYPE_COPYBOOK: str = "COPYBOOK"
+
+# ── Program-Aware Search — known program/file stems (uppercase) ────────────────
+# Every chunk is tagged with file_name = Path(file_path).stem.upper() at ingestion.
+# If any of these names appears in a user query (case-insensitive), the search is
+# restricted to chunks from that program only; otherwise a global search runs.
+# Extend this list as new programs are added to the indexed codebase.
+PROGRAM_CATEGORIES: List[str] = [
+    "OCESQL",       # Open-COBOL Embedded SQL pre-compiler
+    "PGMOD1",       # PostgreSQL sample module 1
+    "PGMOD2",       # PostgreSQL sample module 2
+    "CUST01",       # Customer record management program
+    "MMAPMATCHFILE",# Memory-map file matching utility
+    "DUMPHEX",      # Hex dump utility
+    "PGMOD3",       # PostgreSQL sample module 3
+    "PGMOD4",       # PostgreSQL sample module 4
+]
 
 # ── COBOL Dependency Keywords ──────────────────────────────────────────────────
 COBOL_DEPENDENCY_KEYWORDS: List[str] = ["CALL", "COPY", "USING"]

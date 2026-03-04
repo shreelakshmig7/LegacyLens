@@ -25,7 +25,7 @@ from legacylens.config.constants import (
     TOP_K,
 )
 from legacylens.ingestion.embedder import embed_chunks
-from legacylens.retrieval.query_processor import process_query
+from legacylens.retrieval.query_processor import detect_program, process_query
 from legacylens.retrieval.vector_store import _get_collection, query_similar
 
 logger = logging.getLogger(__name__)
@@ -110,6 +110,26 @@ def _bm25_search(query: str, top_k: int) -> List[Dict[str, Any]]:
     return results
 
 
+def _filter_bm25_by_program(
+    results: List[Dict[str, Any]],
+    program: Optional[str],
+) -> List[Dict[str, Any]]:
+    """
+    Filter a list of BM25 result dicts to only those whose metadata file_name
+    matches the requested program. If program is None all results are returned.
+
+    Args:
+        results: List of BM25 result dicts, each with a "metadata" sub-dict.
+        program: Uppercase program stem to filter on, or None for no filtering.
+
+    Returns:
+        list[dict]: Filtered (or unfiltered) results.
+    """
+    if program is None:
+        return results
+    return [r for r in results if r.get("metadata", {}).get("file_name") == program]
+
+
 def search(query: str, top_k: int = TOP_K) -> dict:
     """
     Run retrieval: normalize query, embed with Voyage, similarity search; if results < 3, BM25 fallback.
@@ -136,7 +156,6 @@ def search(query: str, top_k: int = TOP_K) -> dict:
             }
 
         processed = process_query(query.strip())
-        print("  query_processor done", flush=True)
         if not processed["success"]:
             return {
                 "success": False,
@@ -147,6 +166,15 @@ def search(query: str, top_k: int = TOP_K) -> dict:
         normalized = processed["data"]["normalized_query"]
         if not normalized:
             return {"success": True, "data": {"results": []}, "error": None}
+
+        # Detect if query targets a specific program; build ChromaDB filter if so.
+        program_filter: Optional[str] = None
+        detect_result = detect_program(query.strip())
+        if detect_result["success"] and detect_result["data"]["program"]:
+            program_filter = detect_result["data"]["program"]
+            logger.info("Program-aware search: restricting to file_name=%s", program_filter)
+
+        chroma_filters = {"file_name": program_filter} if program_filter else None
 
         # Embed query (single chunk)
         embed_result = embed_chunks([{"text": normalized}])
@@ -162,7 +190,7 @@ def search(query: str, top_k: int = TOP_K) -> dict:
             return {"success": False, "data": None, "error": "No query embedding returned"}
 
         query_vector = chunks[0]["embedding"]
-        sim_result = query_similar(query_vector, top_k=top_k)
+        sim_result = query_similar(query_vector, top_k=top_k, filters=chroma_filters)
 
         if not sim_result["success"]:
             return {
@@ -179,7 +207,8 @@ def search(query: str, top_k: int = TOP_K) -> dict:
                 len(results),
                 BM25_FALLBACK_THRESHOLD,
             )
-            results = _bm25_search(normalized, top_k=top_k)
+            bm25_results = _bm25_search(normalized, top_k=top_k)
+            results = _filter_bm25_by_program(bm25_results, program_filter)
 
         return {
             "success": True,

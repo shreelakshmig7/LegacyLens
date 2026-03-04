@@ -4,11 +4,13 @@ query_processor.py
 LegacyLens — RAG System for Legacy Enterprise Codebases — Query normalization and expansion
 --------------------------------------------------------------------------------------------
 Normalizes natural language queries, extracts intent and COBOL entity names (paragraph/section
-identifiers), and expands ambiguous terms using QUERY_EXPANSION_TERMS. All magic values
-come from config.constants.
+identifiers), and expands ambiguous terms using QUERY_EXPANSION_TERMS. Also detects whether
+the user's query mentions a specific program from PROGRAM_CATEGORIES so the retrieval layer
+can apply a file_name metadata filter for program-scoped searches.
 
 Key functions:
-    process_query(raw_query) -> dict
+    process_query(raw_query)  -> dict
+    detect_program(query)     -> dict
 
 Author: Shreelakshmi Gopinatha Rao
 Project: LegacyLens — RAG System for Legacy Enterprise Codebases
@@ -20,6 +22,7 @@ from typing import List
 
 from legacylens.config.constants import (
     LOGIC_QUERY_KEYWORDS,
+    PROGRAM_CATEGORIES,
     QUERY_EXPANSION_TERMS,
 )
 
@@ -122,6 +125,47 @@ def process_query(raw_query: str) -> dict:
 
     except Exception as exc:
         logger.exception("Unexpected error in process_query: %s", exc)
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Unexpected error: {str(exc)}",
+        }
+
+
+def detect_program(query: str) -> dict:
+    """
+    Detect whether a known program name from PROGRAM_CATEGORIES appears in the query.
+
+    Uses case-insensitive substring matching — no LLM call, zero added latency.
+    When two program names appear in the same query the first match (by list order
+    in PROGRAM_CATEGORIES) is returned so results are deterministic.
+
+    Args:
+        query: Raw user query (may be None, empty, or any string).
+
+    Returns:
+        dict: {
+            "success": bool,
+            "data": {
+                "program": str | None  — matched uppercase program name, or None,
+            },
+            "error": None | str,
+        }
+    """
+    try:
+        if not query or not isinstance(query, str):
+            return {"success": True, "data": {"program": None}, "error": None}
+
+        q_lower = query.strip().lower()
+        for program in PROGRAM_CATEGORIES:
+            if program.lower() in q_lower:
+                logger.debug("Program-aware filter activated for query — program: %s", program)
+                return {"success": True, "data": {"program": program}, "error": None}
+
+        return {"success": True, "data": {"program": None}, "error": None}
+
+    except Exception as exc:
+        logger.exception("Unexpected error in detect_program: %s", exc)
         return {
             "success": False,
             "data": None,

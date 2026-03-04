@@ -38,6 +38,11 @@ import pathlib
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+
+def _file_name_from_path(file_path: str) -> str:
+    """Return the uppercase stem of a file path (e.g. '/repo/ocesql.cbl' -> 'OCESQL')."""
+    return pathlib.Path(file_path).stem.upper()
+
 from legacylens.config.constants import (
     CHUNK_OVERLAP_TOKENS,
     CHUNK_TYPE_COPYBOOK,
@@ -128,6 +133,7 @@ def _fixed_size_chunks(
         chunks.append({
             "text": "\n".join(chunk_lines),
             "file_path": file_path,
+            "file_name": _file_name_from_path(file_path),
             "line_range": [chunk_start, chunk_end],
             "type": chunk_type,
             "parent_section": parent_section,
@@ -225,6 +231,7 @@ def _paragraph_chunks(
         chunks.append({
             "text": text,
             "file_path": file_path,
+            "file_name": _file_name_from_path(file_path),
             "line_range": [start, end],
             "type": chunk_type_procedure,
             "parent_section": current_section,
