@@ -231,6 +231,46 @@ def test_fixed_size_chunks_have_overlap() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Oversized procedure paragraph splitting (no drop — preserve retrieval precision)
+# ---------------------------------------------------------------------------
+
+def test_oversized_paragraph_split_into_subchunks() -> None:
+    """An oversized procedure paragraph must be split into multiple chunks, not dropped."""
+    from legacylens.config.constants import MAX_CHUNK_TOKENS
+    # Build procedure content with one paragraph that exceeds MAX_CHUNK_TOKENS.
+    # ~500 tokens ≈ 375 words; use enough lines so one paragraph is oversized.
+    lines_per_chunk = max(80, (MAX_CHUNK_TOKENS * 3) // 10)  # well over limit
+    body_lines = [f"           MOVE WS-{i:04d} TO OUT-{i:04d}." for i in range(lines_per_chunk)]
+    code_lines = [
+        "       IDENTIFICATION DIVISION.",
+        "       PROGRAM-ID. BIGPROG.",
+        "       PROCEDURE DIVISION.",
+        "       BIG-PARA.",
+    ] + body_lines
+    result = _chunk_lines(code_lines, file_path="big.cbl")
+    assert result["success"] is True
+    chunks = result["data"]["chunks"]
+    proc_chunks = [c for c in chunks if c.get("type") == "PROCEDURE"]
+    assert len(proc_chunks) >= 2, (
+        "Oversized paragraph must be split into at least 2 procedure sub-chunks"
+    )
+    # All sub-chunks must keep the same paragraph_name
+    for c in proc_chunks:
+        assert c.get("paragraph_name") == "BIG-PARA", (
+            f"Sub-chunk must preserve paragraph_name BIG-PARA, got {c.get('paragraph_name')!r}"
+        )
+    # Combined line ranges should cover the paragraph (no content dropped)
+    all_lines_covered = set()
+    for c in proc_chunks:
+        lr = c["line_range"]
+        for line_no in range(lr[0], lr[1] + 1):
+            all_lines_covered.add(line_no)
+    assert len(all_lines_covered) >= lines_per_chunk, (
+        "Sub-chunks must cover the full paragraph line range"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Chunk count sanity on real file
 # ---------------------------------------------------------------------------
 
