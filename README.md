@@ -190,7 +190,8 @@ LegacyLens/
 2. Create a new Railway project → connect the repo.
 3. Set all environment variables from `.env.example` in the Railway dashboard.
 4. Add a Railway volume and set `CHROMA_PERSIST_DIR` to the volume mount path so ChromaDB data survives redeploys.
-5. Railway auto-deploys on each push to `main`.
+5. The repo includes a **Procfile** so the API listens on `0.0.0.0` and `$PORT` (required to avoid 502 Bad Gateway). If you override the start command in Railway, use: `uvicorn legacylens.api.main:app --host 0.0.0.0 --port $PORT`.
+6. Railway auto-deploys on each push to `main`.
 
 ---
 
