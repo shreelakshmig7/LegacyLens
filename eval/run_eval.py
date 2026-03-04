@@ -20,6 +20,7 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
 import argparse
+import copy
 import logging
 import os
 import pathlib
@@ -382,6 +383,232 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
         }
 
 
+def run_eval_api(api_url: str, fast: bool = False) -> Dict[str, Any]:
+    """
+    Execute the evaluation benchmark by calling the live HTTP API endpoint.
+
+    Sends POST /query to api_url for each golden test case and scores the
+    response. Retrieval precision is checked against file_path only (the API
+    response does not return paragraph_name). Answer faithfulness uses the
+    answer field from the response.
+
+    Args:
+        api_url: Base URL of the deployed LegacyLens API (e.g. https://…railway.app).
+        fast:    If True, run only the 6 mandatory anchor cases.
+
+    Returns:
+        dict: Same schema as run_eval().
+    """
+    try:
+        import httpx
+    except ImportError:
+        logger.error("httpx not installed — run: pip3 install httpx --user")
+        return {"success": False, "error": "httpx not installed", "total": 0,
+                "retrieval_precision_pct": 0.0, "retrieval_passed": 0,
+                "answer_passed": 0, "results": [], "results_path": ""}
+
+    try:
+        test_cases = load_golden_data()
+        if fast:
+            test_cases = [t for t in test_cases if t.get("id") in _FAST_CASE_IDS]
+            logger.info("Fast mode: running %d mandatory cases only", len(test_cases))
+
+        retrieval_results: List[Dict[str, Any]] = []
+        answer_results: List[Dict[str, Any]] = []
+        latency_warnings: List[str] = []
+
+        for tc in test_cases:
+            print(f"Starting {tc['id']}...", flush=True)
+            query = tc.get("query") or ""
+            case_start = time.monotonic()
+
+            try:
+                resp = httpx.post(
+                    f"{api_url.rstrip('/')}/query",
+                    json={"query": query},
+                    timeout=30.0,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as exc:
+                err_msg = f"API call failed: {exc}"
+                logger.warning("[ERROR] %s — %s", tc["id"], err_msg)
+                retrieval_results.append({
+                    "id": tc["id"], "passed": False,
+                    "matched_chunks": [], "missing_chunks": tc.get("expected_chunks") or [],
+                    "error": err_msg,
+                })
+                answer_results.append({
+                    "id": tc["id"], "passed": False,
+                    "missing_terms": tc.get("must_contain", []), "forbidden_terms": [],
+                    "error": err_msg,
+                })
+                continue
+
+            # Build fake result dicts from file_paths for retrieval scoring.
+            # paragraph_name is not in the API response so it is left empty;
+            # scoring will match on file_path only.
+            file_paths = data.get("file_paths") or []
+            scores = data.get("relevance_scores") or []
+            fake_results = [
+                {"metadata": {"file_path": fp, "paragraph_name": ""},
+                 "score": sc}
+                for fp, sc in zip(file_paths, scores)
+            ]
+
+            ret_score = score_retrieval_precision(tc, fake_results)
+            retrieval_results.append(ret_score)
+
+            answer = data.get("answer") or ""
+            ans_score = score_answer(tc, answer)
+            answer_results.append(ans_score)
+
+            elapsed = time.monotonic() - case_start
+            if elapsed > QUERY_LATENCY_GATE_SECONDS:
+                warn_msg = f"{tc['id']} exceeded latency gate: {elapsed:.2f}s > {QUERY_LATENCY_GATE_SECONDS}s"
+                latency_warnings.append(warn_msg)
+                logger.warning("LATENCY GATE: %s", warn_msg)
+
+            ret_status = "PASS" if ret_score["passed"] else "FAIL"
+            ans_status = "PASS" if ans_score["passed"] else "FAIL"
+            logger.info(
+                "[%s ret / %s ans] %s — %s (%.2fs)",
+                ret_status, ans_status, tc["id"], query[:50], elapsed,
+            )
+
+        total = len(test_cases)
+        retrieval_passed = sum(1 for r in retrieval_results if r["passed"])
+        answer_passed = sum(1 for r in answer_results if r["passed"])
+        retrieval_precision_pct = (retrieval_passed / total * 100.0) if total else 0.0
+        answer_precision_pct = (answer_passed / total * 100.0) if total else 0.0
+        latency_ok = len(latency_warnings) == 0
+
+        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        results_path = _RESULTS_DIR / f"eval_{timestamp}.txt"
+        _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+        with open(results_path, "w", encoding="utf-8") as fh:
+            fh.write(f"LegacyLens Eval (API mode: {api_url}) — {timestamp}\n")
+            fh.write(f"Total: {total}\n")
+            fh.write(f"Retrieval Precision: {retrieval_passed}/{total} ({retrieval_precision_pct:.1f}%) — target >70%\n")
+            fh.write(f"Answer Faithfulness: {answer_passed}/{total} ({answer_precision_pct:.1f}%) — target >70%\n")
+            fh.write(f"Latency Gate ({QUERY_LATENCY_GATE_SECONDS}s): {'PASS' if latency_ok else 'FAIL'}\n")
+            fh.write("NOTE: API mode scores file_path match only (paragraph_name not in HTTP response)\n\n")
+            if latency_warnings:
+                for w in latency_warnings:
+                    fh.write(f"  LATENCY WARN: {w}\n")
+            for i, tc in enumerate(test_cases):
+                ret = retrieval_results[i]
+                ans = answer_results[i]
+                status = "ERROR" if ret.get("error") else ("PASS" if ret["passed"] else "FAIL")
+                fh.write(f"[ret {status} / ans {'PASS' if ans['passed'] else 'FAIL'}] {tc['id']}\n")
+                if ret.get("error"):
+                    fh.write(f"  retrieval ERROR: {ret['error']}\n")
+                if ret.get("missing_chunks"):
+                    fh.write(f"  retrieval missing: {ret['missing_chunks']}\n")
+                if ans.get("missing_terms"):
+                    fh.write(f"  answer missing: {ans['missing_terms']}\n")
+                if ans.get("forbidden_terms"):
+                    fh.write(f"  answer forbidden: {ans['forbidden_terms']}\n")
+
+        logger.info(
+            "Eval complete. Retrieval: %d/%d (%.1f%%). Answer: %d/%d (%.1f%%). Latency: %s. Results: %s",
+            retrieval_passed, total, retrieval_precision_pct,
+            answer_passed, total, answer_precision_pct,
+            "PASS" if latency_ok else "FAIL", results_path,
+        )
+
+        return {
+            "success": retrieval_precision_pct >= 70.0 and answer_precision_pct >= 70.0,
+            "total": total,
+            "retrieval_precision_pct": retrieval_precision_pct,
+            "retrieval_passed": retrieval_passed,
+            "answer_passed": answer_passed,
+            "answer_precision_pct": answer_precision_pct,
+            "latency_gate_ok": latency_ok,
+            "latency_warnings": latency_warnings,
+            "results_path": str(results_path),
+        }
+
+    except Exception as exc:
+        logger.exception("API eval runner failed: %s", exc)
+        return {
+            "success": False, "error": str(exc), "total": 0,
+            "retrieval_precision_pct": 0.0, "retrieval_passed": 0,
+            "answer_passed": 0, "results": [], "results_path": "",
+        }
+
+
+def run_eval_staged(fast: bool = False) -> Dict[str, Any]:
+    """
+    Run staged evaluation methodology and write one consolidated report.
+
+    Stages:
+      1. BM25 baseline (LEGACYLENS_RETRIEVAL_MODE=bm25)
+      2. Vector similarity only (LEGACYLENS_RETRIEVAL_MODE=vector_only)
+      3. Hybrid retrieval (LEGACYLENS_RETRIEVAL_MODE=hybrid)
+      4. Full pipeline (same as stage 3, explicit final gate)
+
+    Args:
+        fast: If True, run only mandatory anchor cases in each stage.
+
+    Returns:
+        dict: Consolidated staged summary.
+    """
+    original_env = copy.deepcopy(os.environ)
+    stages = [
+        ("stage_1_bm25_baseline", "bm25"),
+        ("stage_2_vector_only", "vector_only"),
+        ("stage_3_hybrid", "hybrid"),
+        ("stage_4_full_pipeline", "hybrid"),
+    ]
+    stage_results: List[Dict[str, Any]] = []
+    try:
+        for stage_name, retrieval_mode in stages:
+            os.environ["LEGACYLENS_RETRIEVAL_MODE"] = retrieval_mode
+            logger.info("Running %s (retrieval_mode=%s)", stage_name, retrieval_mode)
+            result = run_eval(fast=fast)
+            stage_results.append(
+                {
+                    "stage": stage_name,
+                    "retrieval_mode": retrieval_mode,
+                    "success": bool(result.get("success", False)),
+                    "retrieval_precision_pct": float(result.get("retrieval_precision_pct", 0.0)),
+                    "answer_precision_pct": float(result.get("answer_precision_pct", 0.0)),
+                    "latency_gate_ok": bool(result.get("latency_gate_ok", False)),
+                    "results_path": result.get("results_path", ""),
+                }
+            )
+
+        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        results_path = _RESULTS_DIR / f"eval_staged_{timestamp}.txt"
+        _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(results_path, "w", encoding="utf-8") as fh:
+            fh.write(f"LegacyLens Staged Eval — {timestamp}\n")
+            fh.write(f"Fast mode: {'ON' if fast else 'OFF'}\n\n")
+            for stage in stage_results:
+                fh.write(
+                    f"[{stage['stage']}] mode={stage['retrieval_mode']} "
+                    f"retr={stage['retrieval_precision_pct']:.1f}% "
+                    f"ans={stage['answer_precision_pct']:.1f}% "
+                    f"latency={'PASS' if stage['latency_gate_ok'] else 'FAIL'} "
+                    f"overall={'PASS' if stage['success'] else 'FAIL'}\n"
+                )
+                if stage["results_path"]:
+                    fh.write(f"  detailed_results: {stage['results_path']}\n")
+            fh.write("\n")
+
+        overall_success = all(s["success"] for s in stage_results)
+        return {
+            "success": overall_success,
+            "stages": stage_results,
+            "results_path": str(results_path),
+        }
+    finally:
+        os.environ.clear()
+        os.environ.update(original_env)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run LegacyLens eval benchmark")
     parser.add_argument(
@@ -389,15 +616,48 @@ if __name__ == "__main__":
         action="store_true",
         help="Run only 6 mandatory cases (ll-001 through ll-006)",
     )
+    parser.add_argument(
+        "--api",
+        metavar="URL",
+        default=None,
+        help="Run eval against a live HTTP API instead of the local pipeline "
+             "(e.g. https://legacylens-api-production-d534.up.railway.app)",
+    )
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Run staged eval methodology (BM25 baseline -> vector-only -> hybrid -> full pipeline)",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    summary = run_eval(fast=args.fast)
-    print(f"\nResult: {'PASS' if summary.get('success') else 'FAIL'}")
-    print(f"Retrieval:  {summary.get('retrieval_passed', 0)}/{summary.get('total', 0)} ({summary.get('retrieval_precision_pct', 0):.1f}%) — target >70%")
-    print(f"Answer:     {summary.get('answer_passed', 0)}/{summary.get('total', 0)} ({summary.get('answer_precision_pct', 0):.1f}%) — target >70%")
-    print(f"Latency gate ({QUERY_LATENCY_GATE_SECONDS}s): {'PASS' if summary.get('latency_gate_ok', True) else 'FAIL'}")
-    if summary.get("latency_warnings"):
-        for w in summary["latency_warnings"]:
-            print(f"  LATENCY WARN: {w}")
-    if summary.get("results_path"):
-        print(f"Results saved: {summary['results_path']}")
+
+    if args.staged and args.api:
+        raise SystemExit("--staged cannot be combined with --api")
+
+    if args.staged:
+        summary = run_eval_staged(fast=args.fast)
+        print(f"\nResult: {'PASS' if summary.get('success') else 'FAIL'}")
+        for stage in summary.get("stages", []):
+            print(
+                f"{stage['stage']}: retrieval={stage['retrieval_precision_pct']:.1f}% "
+                f"answer={stage['answer_precision_pct']:.1f}% "
+                f"latency={'PASS' if stage['latency_gate_ok'] else 'FAIL'} "
+                f"overall={'PASS' if stage['success'] else 'FAIL'}"
+            )
+        if summary.get("results_path"):
+            print(f"Results saved: {summary['results_path']}")
+    elif args.api:
+        summary = run_eval_api(api_url=args.api, fast=args.fast)
+    else:
+        summary = run_eval(fast=args.fast)
+
+    if not args.staged:
+        print(f"\nResult: {'PASS' if summary.get('success') else 'FAIL'}")
+        print(f"Retrieval:  {summary.get('retrieval_passed', 0)}/{summary.get('total', 0)} ({summary.get('retrieval_precision_pct', 0):.1f}%) — target >70%")
+        print(f"Answer:     {summary.get('answer_passed', 0)}/{summary.get('total', 0)} ({summary.get('answer_precision_pct', 0):.1f}%) — target >70%")
+        print(f"Latency gate ({QUERY_LATENCY_GATE_SECONDS}s): {'PASS' if summary.get('latency_gate_ok', True) else 'FAIL'}")
+        if summary.get("latency_warnings"):
+            for w in summary["latency_warnings"]:
+                print(f"  LATENCY WARN: {w}")
+        if summary.get("results_path"):
+            print(f"Results saved: {summary['results_path']}")

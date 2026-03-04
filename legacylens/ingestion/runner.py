@@ -36,7 +36,15 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from legacylens.config.constants import validate_required_env_vars
+# Load .env from project root so VOYAGE_API_KEY, REPO_PATH, etc. are set when run as __main__
+try:
+    from dotenv import load_dotenv
+    _env_path = pathlib.Path(__file__).resolve().parent.parent.parent / ".env"
+    load_dotenv(_env_path)
+except ImportError:
+    pass
+
+from legacylens.config.constants import MAX_CHUNK_TOKENS, validate_required_env_vars
 from legacylens.ingestion.chunker import chunk_file
 from legacylens.ingestion.embedder import embed_chunks
 from legacylens.ingestion.file_discovery import discover_files
@@ -73,6 +81,59 @@ def _save_json(name: str, data: dict) -> pathlib.Path:
     path.write_text(json.dumps(data, indent=2))
     logger.info("Saved result artefact: %s", path)
     return path
+
+
+def _estimate_tokens(text: str) -> int:
+    """Estimate tokens using the same heuristic as chunker/embedder."""
+    return max(1, int(len((text or "").split()) / 0.75))
+
+
+def _build_chunk_validation(chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Build chunk validation summary (distribution + line-range coverage proxy).
+
+    Args:
+        chunks: Produced chunk dicts.
+
+    Returns:
+        dict: Validation report payload.
+    """
+    if not chunks:
+        return {
+            "chunk_count": 0,
+            "token_distribution": {"min": 0, "max": 0, "avg": 0.0},
+            "line_range_coverage_pct": 0.0,
+            "all_chunks_within_token_limit": True,
+        }
+
+    token_counts = [_estimate_tokens(c.get("text", "")) for c in chunks]
+
+    covered_line_units = 0
+    observed_line_span = 0
+    for c in chunks:
+        line_range = c.get("line_range", [0, 0])
+        if not isinstance(line_range, list) or len(line_range) != 2:
+            continue
+        start = int(line_range[0])
+        end = int(line_range[1])
+        if end >= start and start > 0:
+            covered_line_units += (end - start + 1)
+            observed_line_span = max(observed_line_span, end)
+
+    coverage_pct = 0.0
+    if observed_line_span > 0:
+        coverage_pct = round(min(100.0, (covered_line_units / observed_line_span) * 100.0), 2)
+
+    return {
+        "chunk_count": len(chunks),
+        "token_distribution": {
+            "min": min(token_counts),
+            "max": max(token_counts),
+            "avg": round(sum(token_counts) / len(token_counts), 2),
+        },
+        "line_range_coverage_pct": coverage_pct,
+        "all_chunks_within_token_limit": max(token_counts) <= MAX_CHUNK_TOKENS,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +321,8 @@ def run_ingestion(repo_path: str) -> dict:
         "chunks_embedded": len(embedded),
         "chunks_skipped_oversized": skipped,
         "verified": store_result["data"]["verified"],
+        "chunks_rejected_metadata": store_result["data"].get("rejected_count", 0),
+        "chunk_validation": _build_chunk_validation(all_chunks),
     }
     timing_report = {
         "run_at": coverage["run_at"],
@@ -298,7 +361,8 @@ def run_ingestion(repo_path: str) -> dict:
 if __name__ == "__main__":
     env_check = validate_required_env_vars()
     if not env_check["success"]:
-        raise SystemExit(f"Missing environment variables: {env_check['error']}")
+        missing = env_check.get("missing", [])
+        raise SystemExit(f"Missing environment variables: {', '.join(missing)}")
 
     repo_path = os.getenv("REPO_PATH", "")
     if not repo_path:

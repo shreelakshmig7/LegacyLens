@@ -1,0 +1,17 @@
+# LegacyLens — dependencies only (no editable install of the project)
+# Use this if "pip install -r requirements.txt" fails with permission denied on the
+# editable install (-e .). Then run commands with: PYTHONPATH=. python3 ...
+# Example: PYTHONPATH=. python3 eval/run_eval.py
+
+fastapi>=0.111.0,<0.112.0
+uvicorn[standard]>=0.29.0,<0.30.0
+streamlit>=1.35.0,<2.0.0
+chromadb>=0.5.0,<0.6.0
+voyageai>=0.2.3,<0.3.0
+openai>=1.30.0,<2.0.0
+rank-bm25>=0.2.2,<0.3.0
+python-dotenv>=1.0.1,<2.0.0
+pyyaml>=6.0.1,<7.0.0
+httpx>=0.27.0,<0.28.0
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.23.0,<0.24.0

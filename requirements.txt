@@ -1,6 +1,9 @@
 # LegacyLens — RAG System for Legacy Enterprise Codebases
 # Python dependencies
 # Pin major versions; patch versions float so security fixes apply automatically.
+# If the editable install (-e .) fails with "Permission denied", use
+#   pip install -r requirements-deps-only.txt
+# and run with PYTHONPATH=. (e.g. PYTHONPATH=. python3 eval/run_eval.py).
 
 # ── Install the legacylens package itself (required for Railway deployment) ────
 -e .

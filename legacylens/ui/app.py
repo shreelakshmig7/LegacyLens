@@ -412,8 +412,8 @@ def main() -> None:
                     answer_placeholder.markdown(answer_text)
                     st.session_state[KEY_LAST_METADATA] = metadata
                     st.session_state[KEY_LAST_ANSWER] = answer_text
-                    st.subheader("Retrieved chunks")
-                    _render_chunks(metadata)
+                    with st.expander("Retrieved chunks", expanded=False):
+                        _render_chunks(metadata)
                 else:
                     answer_placeholder.markdown(answer_text or "(No answer returned.)")
                     st.session_state[KEY_LAST_ANSWER] = answer_text
@@ -426,8 +426,8 @@ def main() -> None:
     elif st.session_state.get(KEY_LAST_METADATA):
         st.subheader("Answer")
         st.markdown(st.session_state.get(KEY_LAST_ANSWER, ""))
-        st.subheader("Retrieved chunks")
-        _render_chunks(st.session_state[KEY_LAST_METADATA])
+        with st.expander("Retrieved chunks", expanded=False):
+            _render_chunks(st.session_state[KEY_LAST_METADATA])
 
 
 if __name__ == "__main__":

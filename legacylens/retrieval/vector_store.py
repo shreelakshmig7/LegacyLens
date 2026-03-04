@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional
 from legacylens.config.constants import (
     CHROMA_PERSIST_DIR,
     EMBEDDING_DIMENSIONS,
+    MANDATORY_METADATA_FIELDS,
     SENSITIVE_LOG_FIELDS,
     TOP_K,
 )
@@ -56,6 +57,26 @@ _UNSAFE_CHARS_RE = re.compile(r"[\x00-\x1f<>&\"'\\]")
 _COLLECTION_NAME = "legacylens_cobol"
 
 
+def _is_valid_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate mandatory metadata fields and required non-empty values.
+
+    Args:
+        metadata: Sanitized metadata candidate.
+
+    Returns:
+        dict: {"valid": bool, "reason": str}
+    """
+    for field in MANDATORY_METADATA_FIELDS:
+        if field not in metadata:
+            return {"valid": False, "reason": f"Missing mandatory metadata field: {field}"}
+    non_empty_fields = ("file_path", "file_name", "line_range", "type", "parent_section")
+    for field in non_empty_fields:
+        if str(metadata.get(field, "")).strip() == "":
+            return {"valid": False, "reason": f"Mandatory metadata field is empty: {field}"}
+    return {"valid": True, "reason": ""}
+
+
 # ---------------------------------------------------------------------------
 # ChromaDB client factory
 # ---------------------------------------------------------------------------
@@ -70,9 +91,14 @@ def _get_collection():
         chromadb.Collection: The LegacyLens chunk collection.
     """
     import chromadb  # type: ignore
+    from chromadb.config import Settings
 
     # Path from config only — never hardcoded (local: ./chroma_db, Railway: /data/chroma_db via env)
-    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+    # Disable anonymized telemetry to avoid "capture() takes 1 positional argument but 3 were given" (Chroma/PostHog bug)
+    client = chromadb.PersistentClient(
+        path=CHROMA_PERSIST_DIR,
+        settings=Settings(anonymized_telemetry=False),
+    )
     collection = client.get_or_create_collection(
         name=_COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"},
@@ -227,23 +253,39 @@ def insert_chunks(
         embeddings: List[List[float]] = []
         documents: List[str] = []
         metadatas: List[Dict[str, Any]] = []
+        rejected_count = 0
 
         for chunk in chunks:
-            chunk_id = str(uuid.uuid4())
-            ids.append(chunk_id)
-            embeddings.append(chunk["embedding"])
-            documents.append(chunk["text"])
-
             raw_meta = {
                 "file_path": chunk.get("file_path", ""),
-                "file_name": chunk.get("file_name", ""),
+                "file_name": chunk.get("file_name", "") or pathlib.Path(chunk.get("file_path", "")).stem.upper(),
                 "line_range": str(chunk.get("line_range", [0, 0])),
                 "type": chunk.get("type", ""),
                 "parent_section": chunk.get("parent_section", ""),
                 "paragraph_name": chunk.get("paragraph_name", ""),
                 "dependencies": ",".join(chunk.get("dependencies", [])),
+                "comment_weight": float(chunk.get("comment_weight", 1.0)),
+                "dead_code_flag": bool(chunk.get("dead_code_flag", False)),
             }
-            metadatas.append(sanitize_metadata(raw_meta, repo_root=repo_root))
+            clean_meta = sanitize_metadata(raw_meta, repo_root=repo_root)
+            meta_check = _is_valid_metadata(clean_meta)
+            if not meta_check["valid"]:
+                rejected_count += 1
+                logger.warning("Rejecting chunk due to invalid metadata: %s", meta_check["reason"])
+                continue
+
+            chunk_id = str(uuid.uuid4())
+            ids.append(chunk_id)
+            embeddings.append(chunk["embedding"])
+            documents.append(chunk["text"])
+            metadatas.append(clean_meta)
+
+        if not ids:
+            return {
+                "success": True,
+                "data": {"inserted_count": 0, "rejected_count": rejected_count, "verified": True},
+                "error": None,
+            }
 
         collection.add(
             ids=ids,
@@ -254,26 +296,26 @@ def insert_chunks(
 
         # Zero-tolerance verification
         count_after = collection.count()
-        expected = count_before + len(chunks)
+        expected = count_before + len(ids)
 
         if count_after != expected:
             msg = (
                 f"Insertion verification failed: expected {expected} documents "
                 f"in collection, found {count_after}. "
-                f"({len(chunks)} chunks were submitted, delta={count_after - count_before})"
+                f"({len(ids)} chunks were submitted, delta={count_after - count_before})"
             )
             logger.error(msg)
             return {"success": False, "data": None, "error": msg}
 
         logger.info(
             "Inserted and verified %d chunks into ChromaDB (total: %d)",
-            len(chunks),
+            len(ids),
             count_after,
         )
 
         return {
             "success": True,
-            "data": {"inserted_count": len(chunks), "verified": True},
+            "data": {"inserted_count": len(ids), "rejected_count": rejected_count, "verified": True},
             "error": None,
         }
 

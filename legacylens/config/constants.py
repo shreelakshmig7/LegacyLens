@@ -39,6 +39,8 @@ BM25_FALLBACK_THRESHOLD: int = 3  # Trigger BM25 fallback when similarity result
 # ── Reranker (no magic numbers in reranker.py) ──────────────────────────────────
 RERANK_PARAGRAPH_BOOST_WEIGHT: float = 0.15  # Add to score when paragraph_name matches query
 RERANK_DATA_DEPRIORITIZE_WEIGHT: float = -0.2  # Add to score for DATA chunks on logic queries
+RERANK_COMMENT_HEAVY_WEIGHT: float = -0.05  # Slightly penalize comment-heavy chunks.
+RERANK_DEAD_CODE_WEIGHT: float = -0.1  # Penalize chunks flagged as dead-code-heavy.
 LOGIC_QUERY_KEYWORDS: List[str] = [
     "what does", "explain", "how does", "entry point", "function", "paragraph",
     "what is", "where is", "how to", "what are", "where are", "main entry",
@@ -92,6 +94,7 @@ EMBEDDING_MODEL: str = "voyage-code-2"
 EMBEDDING_DIMENSIONS: int = 1536
 INGESTION_BATCH_SIZE: int = 300
 VOYAGE_API_TIMEOUT_SECONDS: int = 30  # Max wait per embedding API call; prevents eval hang
+EMBEDDING_BATCH_WORKERS: int = int(os.getenv("EMBEDDING_BATCH_WORKERS", "2"))
 
 # ── Query Safety ──────────────────────────────────────────────────────────────
 # Terms whose presence in a query signals the question is outside the domain of
@@ -147,9 +150,20 @@ DEFAULT_REPO_COMMIT: str = os.getenv("REPO_COMMIT", "")
 CHROMA_PERSIST_DIR: str = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
 CHROMA_GET_ALL_LIMIT: int = 25000  # Max docs to fetch for BM25 in-memory index
 DATA_XREF_MAX_CHUNKS: int = 100   # Max DATA chunks to fetch per file for variable xref
+SECTION_CONTEXT_MAX_CHUNKS: int = 4  # Max chunks to pull for parent section context.
+MAX_ASSEMBLED_CONTEXT_CHARS: int = 12000  # Soft cap for LLM context assembly per query.
 
 # ── Metadata Schema Fields ─────────────────────────────────────────────────────
 METADATA_FIELDS: List[str] = [
+    "file_path",
+    "file_name",
+    "line_range",
+    "type",
+    "parent_section",
+    "paragraph_name",
+    "dependencies",
+]
+MANDATORY_METADATA_FIELDS: List[str] = [
     "file_path",
     "file_name",
     "line_range",

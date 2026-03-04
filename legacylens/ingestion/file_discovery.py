@@ -19,7 +19,7 @@ import logging
 import pathlib
 from typing import List
 
-from legacylens.config.constants import COBOL_EXTENSIONS
+from legacylens.config.constants import COBOL_EXTENSIONS, FORTRAN_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def discover_files(repo_path: str) -> dict:
                 ),
             }
 
-        valid_extensions = {ext.lower() for ext in COBOL_EXTENSIONS}
+        valid_extensions = {ext.lower() for ext in (COBOL_EXTENSIONS + FORTRAN_EXTENSIONS)}
 
         seen_resolved: set = set()
         discovered: List[pathlib.Path] = []

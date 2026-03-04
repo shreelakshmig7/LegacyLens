@@ -78,6 +78,47 @@ def _infer_intent(normalized: str) -> str:
     return "general"
 
 
+def _infer_target_type(normalized: str) -> str:
+    """
+    Infer chunk type filter target based on query semantics.
+
+    Args:
+        normalized: Normalized lowercase query.
+
+    Returns:
+        str: "PROCEDURE", "DATA", or "".
+    """
+    if not normalized:
+        return ""
+    data_signals = (
+        "data division",
+        "working-storage",
+        "linkage section",
+        "file section",
+        "fd ",
+        "field",
+        "record layout",
+        "variable",
+        "definition",
+    )
+    procedure_signals = (
+        "what does",
+        "explain",
+        "logic",
+        "flow",
+        "how does",
+        "paragraph",
+        "section",
+        "entry point",
+        "perform",
+    )
+    if any(s in normalized for s in data_signals):
+        return "DATA"
+    if any(s in normalized for s in procedure_signals):
+        return "PROCEDURE"
+    return ""
+
+
 def process_query(raw_query: str) -> dict:
     """
     Normalize query, extract intent and entities, expand ambiguous terms.
@@ -92,6 +133,7 @@ def process_query(raw_query: str) -> dict:
                 "normalized_query": str,
                 "intent": str,
                 "entities": list[str],
+                "target_type": str,
             },
             "error": None | str,
         }
@@ -104,6 +146,7 @@ def process_query(raw_query: str) -> dict:
                     "normalized_query": "",
                     "intent": "general",
                     "entities": [],
+                    "target_type": "",
                 },
                 "error": None,
             }
@@ -112,6 +155,7 @@ def process_query(raw_query: str) -> dict:
         entities = _extract_entities(raw_query)
         expanded = _expand_ambiguous_terms(normalized)
         intent = _infer_intent(normalized)
+        target_type = _infer_target_type(normalized)
 
         return {
             "success": True,
@@ -119,6 +163,7 @@ def process_query(raw_query: str) -> dict:
                 "normalized_query": expanded,
                 "intent": intent,
                 "entities": entities,
+                "target_type": target_type,
             },
             "error": None,
         }

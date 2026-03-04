@@ -30,6 +30,7 @@ import time
 from typing import Any, Dict, List
 
 from legacylens.config.constants import (
+    EMBEDDING_BATCH_WORKERS,
     EMBEDDING_MODEL,
     INGESTION_BATCH_SIZE,
     MAX_CHUNK_TOKENS,
@@ -156,6 +157,22 @@ def _embed_batch_with_retry(client, texts: List[str]) -> List[List[float]]:
     raise last_exc
 
 
+def _embed_batch_task(batch_index: int, texts: List[str]) -> Dict[str, Any]:
+    """
+    Embed one batch in a worker-safe wrapper.
+
+    Args:
+        batch_index: Stable batch order index.
+        texts: Batch texts.
+
+    Returns:
+        dict: {"batch_index": int, "embeddings": list[list[float]]}
+    """
+    client = _get_voyage_client()
+    embeddings = _embed_batch_with_retry(client, texts)
+    return {"batch_index": batch_index, "embeddings": embeddings}
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -193,7 +210,8 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> dict:
         }
 
     try:
-        client = _get_voyage_client()
+        if EMBEDDING_BATCH_WORKERS <= 1:
+            _ = _get_voyage_client()
     except Exception as exc:
         logger.error("Failed to initialise Voyage AI client: %s", exc)
         return {
@@ -231,24 +249,58 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> dict:
     embedded_chunks: List[Dict[str, Any]] = []
 
     try:
+        batches: List[List[Dict[str, Any]]] = []
         for batch_start in range(0, len(valid_chunks), INGESTION_BATCH_SIZE):
             batch = valid_chunks[batch_start : batch_start + INGESTION_BATCH_SIZE]
-            texts = [c["text"] for c in batch]
+            batches.append(batch)
 
-            logger.info(
-                "Embedding batch %d-%d of %d chunks",
-                batch_start + 1,
-                batch_start + len(batch),
-                len(valid_chunks),
-            )
+        if EMBEDDING_BATCH_WORKERS <= 1:
+            client = _get_voyage_client()
+            for batch_index, batch in enumerate(batches):
+                batch_start = batch_index * INGESTION_BATCH_SIZE
+                texts = [c["text"] for c in batch]
+                logger.info(
+                    "Embedding batch %d-%d of %d chunks",
+                    batch_start + 1,
+                    batch_start + len(batch),
+                    len(valid_chunks),
+                )
+                embeddings = _embed_batch_with_retry(client, texts)
+                for chunk, vector in zip(batch, embeddings):
+                    new_chunk = copy.deepcopy(chunk)
+                    new_chunk["embedding"] = vector
+                    embedded_chunks.append(new_chunk)
+        else:
+            logger.info("Embedding with %d parallel workers", EMBEDDING_BATCH_WORKERS)
+            futures: List[Any] = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=EMBEDDING_BATCH_WORKERS) as executor:
+                for batch_index, batch in enumerate(batches):
+                    batch_start = batch_index * INGESTION_BATCH_SIZE
+                    logger.info(
+                        "Queueing batch %d-%d of %d chunks",
+                        batch_start + 1,
+                        batch_start + len(batch),
+                        len(valid_chunks),
+                    )
+                    futures.append(
+                        executor.submit(
+                            _embed_batch_task,
+                            batch_index,
+                            [c["text"] for c in batch],
+                        )
+                    )
 
-            embeddings = _embed_batch_with_retry(client, texts)
+                ordered: Dict[int, List[List[float]]] = {}
+                for fut in concurrent.futures.as_completed(futures):
+                    result = fut.result()
+                    ordered[result["batch_index"]] = result["embeddings"]
 
-            # Step 4: attach vectors to deep copies — never mutate input
-            for chunk, vector in zip(batch, embeddings):
-                new_chunk = copy.deepcopy(chunk)
-                new_chunk["embedding"] = vector
-                embedded_chunks.append(new_chunk)
+            for batch_index, batch in enumerate(batches):
+                embeddings = ordered.get(batch_index, [])
+                for chunk, vector in zip(batch, embeddings):
+                    new_chunk = copy.deepcopy(chunk)
+                    new_chunk["embedding"] = vector
+                    embedded_chunks.append(new_chunk)
 
     except Exception as exc:
         logger.error("Embedding failed after %d retries: %s", MAX_RETRIES, exc)

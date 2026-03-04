@@ -39,6 +39,7 @@ from legacylens.generation.answer_generator import (
     _OUT_OF_SCOPE_TEMPLATE,
     _build_github_link,
     _is_out_of_scope,
+    _normalize_file_path,
     _parse_line_range,
     _sanitize_query,
     generate_answer,
@@ -100,7 +101,7 @@ def _build_metadata_from_assembled(
         lr = meta.get("line_range") or ""
         line_num = _parse_line_range(lr)
         chunks.append((r.get("text") or "").strip())
-        file_paths.append(fp)
+        file_paths.append(_normalize_file_path(fp))
         line_numbers.append(line_num)
         github_links.append(_build_github_link(fp, str(lr)))
         relevance_scores.append(float(r.get("score", 0.0)))
@@ -170,13 +171,23 @@ def query(request: QueryRequest):
 
         gen_result = generate_answer(sanitized, assembled)
         if not gen_result.get("success"):
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "error": gen_result.get("error", "Answer generation failed"),
-                },
+            logger.warning(
+                "Answer generation failed, returning retrieval-only fallback: %s",
+                gen_result.get("error", "Answer generation failed"),
             )
+            fallback_answer = (
+                "Answer generation is currently unavailable. "
+                "Returning retrieved code evidence with file path and line number references."
+            )
+            meta = _build_metadata_from_assembled(assembled)
+            return {
+                "answer": fallback_answer,
+                "chunks": meta["chunks"],
+                "file_paths": meta["file_paths"],
+                "line_numbers": meta["line_numbers"],
+                "github_links": meta["github_links"],
+                "relevance_scores": meta["relevance_scores"],
+            }
 
         meta = _build_metadata_from_assembled(assembled)
         return {

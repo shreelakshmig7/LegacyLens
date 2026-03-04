@@ -43,6 +43,37 @@ _ID_START = COBOL_IDENTIFICATION_COLS[0]             # 72
 _INDICATOR_COL = _SEQ_END                            # col index 6 (0-based)
 _CODE_START = _SEQ_END + 1                           # col index 7
 
+_DEAD_CODE_HINTS = (
+    "MOVE ",
+    "IF ",
+    "PERFORM ",
+    "CALL ",
+    "COPY ",
+    "OPEN ",
+    "READ ",
+    "WRITE ",
+    "REWRITE ",
+    "PROCEDURE DIVISION",
+)
+
+
+def _looks_like_dead_code(comment_text: str) -> bool:
+    """
+    Heuristic check for commented-out code lines.
+
+    Args:
+        comment_text: Comment content with COBOL columns removed.
+
+    Returns:
+        bool: True when the comment resembles executable COBOL.
+    """
+    text = (comment_text or "").strip().upper()
+    if not text:
+        return False
+    if text[:2].isdigit():
+        return True
+    return any(hint in text for hint in _DEAD_CODE_HINTS)
+
 
 def preprocess_lines(raw_lines: List[str]) -> dict:
     """
@@ -70,6 +101,7 @@ def preprocess_lines(raw_lines: List[str]) -> dict:
     try:
         code_lines: List[str] = []
         comments: List[str] = []
+        dead_code_count = 0
 
         for raw in raw_lines:
             # Strip trailing newline for uniform processing
@@ -92,6 +124,8 @@ def preprocess_lines(raw_lines: List[str]) -> dict:
                 comment_text = raw_code.lstrip("*>").strip()
                 if comment_text:
                     comments.append(comment_text)
+                    if _looks_like_dead_code(comment_text):
+                        dead_code_count += 1
 
             elif indicator in ("D", "d"):
                 # Debug line — discard entirely
@@ -119,6 +153,10 @@ def preprocess_lines(raw_lines: List[str]) -> dict:
                 "code_lines": code_lines,
                 "comments": comments,
                 "line_count": len(code_lines),
+                "comment_count": len(comments),
+                "comment_density": (len(comments) / len(code_lines)) if code_lines else 0.0,
+                "dead_code_count": dead_code_count,
+                "dead_code_flag": dead_code_count > 0,
             },
             "error": None,
         }

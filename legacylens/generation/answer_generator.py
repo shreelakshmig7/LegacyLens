@@ -337,6 +337,7 @@ def _normalize_file_path(absolute_path: str) -> str:
         return relative
 
     if _GNUCOBOL_ANCHOR in absolute_path:
+        # Keep anchor in relative path for stable comparison and links.
         return _GNUCOBOL_ANCHOR + absolute_path.split(_GNUCOBOL_ANCHOR, 1)[-1]
 
     return os.path.basename(absolute_path)

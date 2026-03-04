@@ -20,7 +20,12 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from legacylens.config.constants import CHUNK_TYPE_DATA, DATA_XREF_MAX_CHUNKS
+from legacylens.config.constants import (
+    CHUNK_TYPE_DATA,
+    DATA_XREF_MAX_CHUNKS,
+    MAX_ASSEMBLED_CONTEXT_CHARS,
+    SECTION_CONTEXT_MAX_CHUNKS,
+)
 from legacylens.retrieval.vector_store import _get_collection
 
 logger = logging.getLogger(__name__)
@@ -150,6 +155,75 @@ def _copybook_snippet(dependencies: List[str], file_path: str, repo_root: str) -
     return "\n\n".join(parts)
 
 
+def _section_context_snippet(file_path: str, parent_section: str, current_text: str) -> str:
+    """
+    Fetch additional chunks from the same section for surrounding context.
+
+    Args:
+        file_path: Source file path.
+        parent_section: Parent section label.
+        current_text: Current primary chunk text to avoid duplication.
+
+    Returns:
+        str: Section context text or empty string.
+    """
+    if not file_path or not parent_section:
+        return ""
+    try:
+        collection = _get_collection()
+        raw = collection.get(
+            where={
+                "$and": [
+                    {"file_path": {"$eq": file_path}},
+                    {"parent_section": {"$eq": parent_section}},
+                ]
+            },
+            include=["documents"],
+            limit=SECTION_CONTEXT_MAX_CHUNKS,
+        )
+    except Exception as exc:
+        logger.warning("Failed to load section context for %s [%s]: %s", file_path, parent_section, exc)
+        return ""
+
+    docs = raw.get("documents") or []
+    snippets: List[str] = []
+    base = (current_text or "").strip()
+    for doc in docs:
+        clean = (doc or "").strip()
+        if not clean or clean == base:
+            continue
+        snippets.append(clean)
+    if not snippets:
+        return ""
+    return "\n\n--- Parent section context ---\n" + "\n\n".join(snippets)
+
+
+def _truncate_assembled_text(parts: List[str], max_chars: int = MAX_ASSEMBLED_CONTEXT_CHARS) -> str:
+    """
+    Truncate assembled context by dropping least critical tail parts.
+
+    Args:
+        parts: Ordered context parts (most important first).
+        max_chars: Maximum char budget.
+
+    Returns:
+        str: Truncated assembled context text.
+    """
+    if not parts:
+        return ""
+    kept: List[str] = []
+    total = 0
+    for part in parts:
+        if not part:
+            continue
+        candidate_len = len(part) + (2 if kept else 0)
+        if total + candidate_len > max_chars:
+            break
+        kept.append(part)
+        total += candidate_len
+    return "\n\n".join(kept)
+
+
 def assemble_context(
     results: List[Dict[str, Any]],
     repo_root: str = "",
@@ -190,12 +264,19 @@ def assemble_context(
                 parts.append(xref)
 
         deps = _parse_dependencies(deps_str)
+        if deps:
+            parts.append("--- Dependencies ---\n" + ", ".join(deps))
+
+        section_context = _section_context_snippet(file_path, parent_section, text)
+        if section_context:
+            parts.append(section_context)
+
         if deps and repo_root:
             copybook = _copybook_snippet(deps, file_path, repo_root)
             if copybook:
                 parts.append(copybook)
 
-        item["assembled_context"] = "\n\n".join(parts)
+        item["assembled_context"] = _truncate_assembled_text(parts)
         out.append(item)
 
     return out

@@ -16,6 +16,7 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -174,15 +175,28 @@ def search(query: str, top_k: int = TOP_K) -> dict:
             program_filter = detect_result["data"]["program"]
             logger.info("Program-aware search: restricting to file_name=%s", program_filter)
 
-        chroma_filters = {"file_name": program_filter} if program_filter else None
+        target_type = (processed.get("data") or {}).get("target_type") or ""
+        chroma_filters: Optional[Dict[str, Any]] = {}
+        if program_filter:
+            chroma_filters["file_name"] = program_filter
+        if target_type in ("PROCEDURE", "DATA"):
+            chroma_filters["type"] = target_type
+        if not chroma_filters:
+            chroma_filters = None
 
         # Embed query (single chunk)
         embed_result = embed_chunks([{"text": normalized}])
         if not embed_result["success"]:
+            logger.warning(
+                "Query embedding failed, falling back to BM25-only retrieval: %s",
+                embed_result.get("error", "Embedding failed"),
+            )
+            bm25_results = _bm25_search(normalized, top_k=top_k)
+            bm25_results = _filter_bm25_by_program(bm25_results, program_filter)
             return {
-                "success": False,
-                "data": None,
-                "error": embed_result.get("error", "Embedding failed"),
+                "success": True,
+                "data": {"results": bm25_results},
+                "error": None,
             }
 
         chunks = embed_result["data"]["chunks"]
@@ -190,6 +204,14 @@ def search(query: str, top_k: int = TOP_K) -> dict:
             return {"success": False, "data": None, "error": "No query embedding returned"}
 
         query_vector = chunks[0]["embedding"]
+        retrieval_mode = os.getenv("LEGACYLENS_RETRIEVAL_MODE", "hybrid").strip().lower()
+
+        if retrieval_mode == "bm25":
+            logger.info("Retrieval mode=BM25 (eval baseline)")
+            bm25_results = _bm25_search(normalized, top_k=top_k)
+            results = _filter_bm25_by_program(bm25_results, program_filter)
+            return {"success": True, "data": {"results": results}, "error": None}
+
         sim_result = query_similar(query_vector, top_k=top_k, filters=chroma_filters)
 
         if not sim_result["success"]:
@@ -201,7 +223,15 @@ def search(query: str, top_k: int = TOP_K) -> dict:
 
         results = sim_result["data"]["results"]
 
-        if len(results) < BM25_FALLBACK_THRESHOLD:
+        # If restrictive type filter returns no results, relax type first.
+        if not results and chroma_filters and "type" in chroma_filters:
+            relaxed = dict(chroma_filters)
+            relaxed.pop("type", None)
+            relaxed_result = query_similar(query_vector, top_k=top_k, filters=relaxed or None)
+            if relaxed_result.get("success"):
+                results = (relaxed_result.get("data") or {}).get("results") or []
+
+        if retrieval_mode != "vector_only" and len(results) < BM25_FALLBACK_THRESHOLD:
             logger.info(
                 "Similarity returned %d results (< %d), triggering BM25 fallback",
                 len(results),

@@ -20,7 +20,9 @@ from typing import Any, Dict, List
 
 from legacylens.config.constants import (
     LOGIC_QUERY_KEYWORDS,
+    RERANK_COMMENT_HEAVY_WEIGHT,
     RERANK_DATA_DEPRIORITIZE_WEIGHT,
+    RERANK_DEAD_CODE_WEIGHT,
     RERANK_PARAGRAPH_BOOST_WEIGHT,
 )
 
@@ -82,6 +84,11 @@ def rerank(results: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
             delta += RERANK_PARAGRAPH_BOOST_WEIGHT
         if is_logic and chunk_type == "DATA":
             delta += RERANK_DATA_DEPRIORITIZE_WEIGHT
+        comment_weight = float(meta.get("comment_weight", 1.0))
+        if comment_weight < 0.6:
+            delta += RERANK_COMMENT_HEAVY_WEIGHT
+        if bool(meta.get("dead_code_flag", False)):
+            delta += RERANK_DEAD_CODE_WEIGHT
 
         item["score"] = round(base + delta, 4)
         adjusted.append(item)

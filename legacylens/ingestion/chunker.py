@@ -95,6 +95,8 @@ def _fixed_size_chunks(
     file_path: str,
     chunk_type: str,
     parent_section: str,
+    comment_weight: float = 1.0,
+    dead_code_flag: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Split a list of code lines into fixed-size overlapping chunks.
@@ -139,6 +141,8 @@ def _fixed_size_chunks(
             "parent_section": parent_section,
             "paragraph_name": "",
             "dependencies": [],
+            "comment_weight": comment_weight,
+            "dead_code_flag": dead_code_flag,
         })
 
         # Advance i, keeping CHUNK_OVERLAP_TOKENS worth of lines for the next chunk.
@@ -151,6 +155,48 @@ def _fixed_size_chunks(
         i = max(i + 1, new_i)  # guaranteed forward progress
 
     return chunks
+
+
+def _split_paragraph_by_size(
+    lines: List[str],
+    start_line: int,
+    file_path: str,
+    paragraph_name: str,
+    parent_section: str,
+    chunk_type: str,
+    comment_weight: float = 1.0,
+    dead_code_flag: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Split a procedure paragraph that exceeds MAX_CHUNK_TOKENS into fixed-size
+    sub-chunks with overlap, preserving paragraph_name and metadata on each.
+
+    Used so oversized paragraphs are indexed (not dropped in the embedder),
+    preserving retrieval precision.
+
+    Args:
+        lines: Paragraph body lines (already preprocessed).
+        start_line: 1-based line number of the first line in the source file.
+        file_path: Source file path for metadata.
+        paragraph_name: COBOL paragraph name to attach to every sub-chunk.
+        parent_section: Enclosing DIVISION or SECTION name.
+        chunk_type: CHUNK_TYPE_PROCEDURE.
+
+    Returns:
+        list[dict]: Chunk dicts with text, line_range, paragraph_name, etc.
+    """
+    sub_chunks = _fixed_size_chunks(
+        lines=lines,
+        start_line=start_line,
+        file_path=file_path,
+        chunk_type=chunk_type,
+        parent_section=parent_section,
+        comment_weight=comment_weight,
+        dead_code_flag=dead_code_flag,
+    )
+    for c in sub_chunks:
+        c["paragraph_name"] = paragraph_name or ""
+    return sub_chunks
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +247,8 @@ def _paragraph_chunks(
     file_path: str,
     chunk_type_procedure: str,
     chunk_type_data: str,
+    comment_weight: float = 1.0,
+    dead_code_flag: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Split code lines into paragraph-level chunks for PROCEDURE content and
@@ -221,28 +269,68 @@ def _paragraph_chunks(
     current_para_name: Optional[str] = None
     current_para_lines: List[str] = []
     current_para_start = 1
+    current_para_overlap_name = ""
+    last_paragraph_text = ""
+    last_paragraph_name = ""
+    pending_section_overlap_name = ""
     data_lines: List[str] = []
     data_start = 1
 
-    def flush_paragraph(para_name: Optional[str], lines: List[str], start: int, end: int) -> None:
+    def flush_paragraph(
+        para_name: Optional[str],
+        lines: List[str],
+        start: int,
+        end: int,
+        overlap_name: str = "",
+    ) -> None:
+        nonlocal last_paragraph_text, last_paragraph_name
         if not lines:
             return
         text = "\n".join(lines)
-        chunks.append({
-            "text": text,
-            "file_path": file_path,
-            "file_name": _file_name_from_path(file_path),
-            "line_range": [start, end],
-            "type": chunk_type_procedure,
-            "parent_section": current_section,
-            "paragraph_name": para_name or "",
-            "dependencies": [],
-        })
+        last_paragraph_text = text
+        last_paragraph_name = para_name or ""
+        token_count = _estimate_tokens(text)
+        if token_count > MAX_CHUNK_TOKENS:
+            sub_chunks = _split_paragraph_by_size(
+                lines=lines,
+                start_line=start,
+                file_path=file_path,
+                paragraph_name=para_name or "",
+                parent_section=current_section,
+                chunk_type=chunk_type_procedure,
+                comment_weight=comment_weight,
+                dead_code_flag=dead_code_flag,
+            )
+            for sub in sub_chunks:
+                sub["section_overlap_paragraph"] = overlap_name
+            chunks.extend(sub_chunks)
+        else:
+            chunks.append({
+                "text": text,
+                "file_path": file_path,
+                "file_name": _file_name_from_path(file_path),
+                "line_range": [start, end],
+                "type": chunk_type_procedure,
+                "parent_section": current_section,
+                "paragraph_name": para_name or "",
+                "dependencies": [],
+                "comment_weight": comment_weight,
+                "dead_code_flag": dead_code_flag,
+                "section_overlap_paragraph": overlap_name,
+            })
 
     def flush_data(lines: List[str], start: int) -> None:
         if not lines:
             return
-        sub = _fixed_size_chunks(lines, start, file_path, chunk_type_data, current_section)
+        sub = _fixed_size_chunks(
+            lines,
+            start,
+            file_path,
+            chunk_type_data,
+            current_section,
+            comment_weight=comment_weight,
+            dead_code_flag=dead_code_flag,
+        )
         chunks.extend(sub)
 
     for idx, line in enumerate(code_lines, 1):
@@ -257,12 +345,19 @@ def _paragraph_chunks(
                 in_procedure = True
                 current_section = "PROCEDURE DIVISION"
                 current_para_name = None
+                current_para_overlap_name = ""
                 current_para_lines = []
                 current_para_start = idx
             else:
                 # Non-procedure division — flush any open paragraph
                 if in_procedure:
-                    flush_paragraph(current_para_name, current_para_lines, current_para_start, idx - 1)
+                    flush_paragraph(
+                        current_para_name,
+                        current_para_lines,
+                        current_para_start,
+                        idx - 1,
+                        overlap_name=current_para_overlap_name,
+                    )
                     current_para_lines = []
                 else:
                     flush_data(data_lines, data_start)
@@ -275,10 +370,18 @@ def _paragraph_chunks(
         if _SECTION_RE.search(stripped):
             if in_procedure:
                 # New section in PROCEDURE — flush current paragraph
-                flush_paragraph(current_para_name, current_para_lines, current_para_start, idx - 1)
+                flush_paragraph(
+                    current_para_name,
+                    current_para_lines,
+                    current_para_start,
+                    idx - 1,
+                    overlap_name=current_para_overlap_name,
+                )
                 current_para_lines = []
                 current_para_name = None
+                current_para_overlap_name = ""
                 current_para_start = idx
+                pending_section_overlap_name = last_paragraph_name
             current_section = stripped
             continue
 
@@ -286,9 +389,17 @@ def _paragraph_chunks(
             para_name = _is_paragraph_header(line)
             if para_name:
                 # Flush previous paragraph
-                flush_paragraph(current_para_name, current_para_lines, current_para_start, idx - 1)
+                flush_paragraph(
+                    current_para_name,
+                    current_para_lines,
+                    current_para_start,
+                    idx - 1,
+                    overlap_name=current_para_overlap_name,
+                )
                 current_para_name = para_name
+                current_para_overlap_name = pending_section_overlap_name
                 current_para_lines = [line]
+                pending_section_overlap_name = ""
                 current_para_start = idx
             else:
                 current_para_lines.append(line)
@@ -299,7 +410,13 @@ def _paragraph_chunks(
 
     # Flush any remaining content
     if in_procedure:
-        flush_paragraph(current_para_name, current_para_lines, current_para_start, len(code_lines))
+        flush_paragraph(
+            current_para_name,
+            current_para_lines,
+            current_para_start,
+            len(code_lines),
+            overlap_name=current_para_overlap_name,
+        )
     else:
         flush_data(data_lines, data_start)
 
@@ -314,6 +431,8 @@ def chunk_code_lines(
     code_lines: List[str],
     file_path: str = "unknown.cbl",
     is_copybook: bool = False,
+    comment_density: float = 0.0,
+    dead_code_flag: bool = False,
 ) -> dict:
     """
     Chunk a list of preprocessed COBOL code lines into embedding-ready segments.
@@ -344,6 +463,7 @@ def chunk_code_lines(
             }
 
         if is_copybook:
+            comment_weight = max(0.1, 1.0 - min(0.8, comment_density))
             # Copybooks: chunk with fixed-size strategy, all chunks get COPYBOOK type
             raw_chunks = _fixed_size_chunks(
                 code_lines,
@@ -351,13 +471,18 @@ def chunk_code_lines(
                 file_path=file_path,
                 chunk_type=CHUNK_TYPE_COPYBOOK,
                 parent_section="COPYBOOK",
+                comment_weight=comment_weight,
+                dead_code_flag=dead_code_flag,
             )
         else:
+            comment_weight = max(0.1, 1.0 - min(0.8, comment_density))
             raw_chunks = _paragraph_chunks(
                 code_lines,
                 file_path=file_path,
                 chunk_type_procedure=CHUNK_TYPE_PROCEDURE,
                 chunk_type_data=CHUNK_TYPE_DATA,
+                comment_weight=comment_weight,
+                dead_code_flag=dead_code_flag,
             )
 
         # Filter out empty chunks that might have slipped through
@@ -414,7 +539,13 @@ def chunk_file(file_path: str) -> dict:
             }
 
         code_lines = preprocess_result["data"]["code_lines"]
-        return chunk_code_lines(code_lines, file_path=str(path.resolve()), is_copybook=is_copybook)
+        return chunk_code_lines(
+            code_lines,
+            file_path=str(path.resolve()),
+            is_copybook=is_copybook,
+            comment_density=float(preprocess_result["data"].get("comment_density", 0.0)),
+            dead_code_flag=bool(preprocess_result["data"].get("dead_code_flag", False)),
+        )
 
     except Exception as exc:
         logger.exception("Unexpected error in chunk_file for %s: %s", file_path, exc)
