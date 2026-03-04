@@ -210,6 +210,19 @@ def search(query: str, top_k: int = TOP_K) -> dict:
             bm25_results = _bm25_search(normalized, top_k=top_k)
             results = _filter_bm25_by_program(bm25_results, program_filter)
 
+        # If program filter produced no results at all, retry globally so the
+        # user always gets an answer even when the program isn't in the index.
+        if program_filter and not results:
+            logger.info(
+                "Program filter '%s' returned 0 results — falling back to global search",
+                program_filter,
+            )
+            global_sim = query_similar(query_vector, top_k=top_k, filters=None)
+            if global_sim["success"]:
+                results = global_sim["data"]["results"]
+            if len(results) < BM25_FALLBACK_THRESHOLD:
+                results = _bm25_search(normalized, top_k=top_k)
+
         return {
             "success": True,
             "data": {"results": results},

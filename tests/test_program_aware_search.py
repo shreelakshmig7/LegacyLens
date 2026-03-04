@@ -78,14 +78,16 @@ class TestDetectProgram:
         assert result["data"]["program"] is None
 
     def test_detects_ocesql(self) -> None:
-        """OCESQL must be recognised as a program if present in PROGRAM_CATEGORIES."""
+        """OCESQL must be recognised as a program if present in PROGRAM_CATEGORIES,
+        and must return None (no false positive) if it is not in the list."""
         from legacylens.retrieval.query_processor import detect_program
         from legacylens.config.constants import PROGRAM_CATEGORIES
-        if "OCESQL" not in PROGRAM_CATEGORIES:
-            pytest.skip("OCESQL not in PROGRAM_CATEGORIES")
         result = detect_program("In OCESQL, how is the database connected?")
         assert result["success"] is True
-        assert result["data"]["program"] == "OCESQL"
+        if "OCESQL" in PROGRAM_CATEGORIES:
+            assert result["data"]["program"] == "OCESQL"
+        else:
+            assert result["data"]["program"] is None
 
     def test_detects_pgmod1(self) -> None:
         """PGMOD1 must be recognised as a program if present in PROGRAM_CATEGORIES."""
@@ -293,10 +295,10 @@ class TestProgramCategoriesConstant:
             assert isinstance(name, str)
             assert name == name.upper(), f"{name!r} is not uppercase"
 
-    def test_ocesql_in_program_categories(self) -> None:
-        """OCESQL must be in the default PROGRAM_CATEGORIES list."""
+    def test_cust01_in_program_categories(self) -> None:
+        """CUST01 must be in the default PROGRAM_CATEGORIES list."""
         from legacylens.config.constants import PROGRAM_CATEGORIES
-        assert "OCESQL" in PROGRAM_CATEGORIES
+        assert "CUST01" in PROGRAM_CATEGORIES
 
     def test_pgmod1_in_program_categories(self) -> None:
         """PGMOD1 must be in the default PROGRAM_CATEGORIES list."""
