@@ -13,11 +13,12 @@ Author: Shreelakshmi Gopinatha Rao
 Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
+import io
 import json
 import logging
 import os
-import subprocess
 import threading
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -256,31 +257,60 @@ def query_stream(request: QueryRequest):
 _ingest_state: Dict[str, Any] = {"running": False, "last_result": None}
 
 
-def _run_ingestion_background(clone_dest: str) -> None:
+def _download_and_extract_repo(repo_owner: str, repo_name: str, ref: str, dest: str) -> None:
     """
-    Clone gnucobol-contrib and run the full ingestion pipeline in a background thread.
-    Writes progress to Railway logs. Sets REPO_PATH so the pipeline finds the data.
+    Download a GitHub repo ZIP archive (no git binary required) and extract it to dest.
 
     Args:
-        clone_dest: Absolute path where the repo will be cloned.
+        repo_owner: GitHub username.
+        repo_name: Repository name.
+        ref: Branch name or commit SHA.
+        dest: Destination directory (will be created).
+    """
+    import httpx
+
+    zip_url = f"https://github.com/{repo_owner}/{repo_name}/archive/{ref}.zip"
+    logger.info("[ingest] Downloading %s ...", zip_url)
+    with httpx.Client(timeout=300.0, follow_redirects=True) as client:
+        response = client.get(zip_url)
+        response.raise_for_status()
+
+    logger.info("[ingest] Download complete (%d bytes). Extracting...", len(response.content))
+    parent = str(Path(dest).parent)
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        zf.extractall(parent)
+
+    # GitHub names the extracted folder <repo>-<ref>/  — rename it to dest
+    extracted_name = f"{repo_name}-{ref}"
+    extracted_path = Path(parent) / extracted_name
+    if extracted_path.exists() and not Path(dest).exists():
+        extracted_path.rename(dest)
+        logger.info("[ingest] Extracted to %s", dest)
+    elif Path(dest).exists():
+        logger.info("[ingest] Destination %s already exists — skipping rename.", dest)
+    else:
+        raise FileNotFoundError(f"Extracted path not found: {extracted_path}")
+
+
+def _run_ingestion_background(clone_dest: str) -> None:
+    """
+    Download gnucobol-contrib ZIP from GitHub and run the full ingestion pipeline in a background thread.
+    Uses httpx (no git binary required). Writes progress to Railway logs.
+
+    Args:
+        clone_dest: Absolute path where the repo will be extracted.
     """
     _ingest_state["running"] = True
     _ingest_state["last_result"] = None
     try:
         repo_owner = os.getenv("REPO_OWNER", "shreelakshmig7")
         repo_name = os.getenv("REPO_NAME", "gnucobol-contrib")
-        clone_url = f"https://github.com/{repo_owner}/{repo_name}.git"
+        ref = os.getenv("REPO_COMMIT", "master")
 
         if not Path(clone_dest).exists():
-            logger.info("[ingest] Cloning %s → %s", clone_url, clone_dest)
-            subprocess.run(
-                ["git", "clone", "--depth=1", clone_url, clone_dest],
-                check=True,
-                timeout=300,
-            )
-            logger.info("[ingest] Clone complete.")
+            _download_and_extract_repo(repo_owner, repo_name, ref, clone_dest)
         else:
-            logger.info("[ingest] Repo already present at %s — skipping clone.", clone_dest)
+            logger.info("[ingest] Repo already present at %s — skipping download.", clone_dest)
 
         os.environ["REPO_PATH"] = clone_dest
         logger.info("[ingest] REPO_PATH set to %s. Starting ingestion pipeline...", clone_dest)
@@ -291,16 +321,12 @@ def _run_ingestion_background(clone_dest: str) -> None:
         if result.get("success"):
             data = result.get("data") or {}
             logger.info(
-                "[ingest] SUCCESS — %d chunks stored, %d files, %.1fs total.",
+                "[ingest] SUCCESS — %d chunks stored, %d files.",
                 data.get("chunks_embedded", 0),
                 data.get("files_discovered", 0),
-                (data.get("timing_path") and 0) or 0,
             )
         else:
             logger.error("[ingest] FAILED — %s", result.get("error"))
-    except subprocess.CalledProcessError as exc:
-        logger.exception("[ingest] git clone failed: %s", exc)
-        _ingest_state["last_result"] = {"success": False, "error": f"Clone failed: {exc}"}
     except Exception as exc:
         logger.exception("[ingest] Ingestion failed: %s", exc)
         _ingest_state["last_result"] = {"success": False, "error": str(exc)}
