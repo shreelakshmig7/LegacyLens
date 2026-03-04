@@ -3,7 +3,7 @@ test_context_assembler.py
 -------------------------
 LegacyLens — RAG System for Legacy Enterprise Codebases — Tests for retrieval/context_assembler.py
 ----------------------------------------------------------------------------------------------------
-Runs against real ChromaDB at ./chroma_db for DATA chunk lookup. Copybook resolution uses
+Runs against real ChromaDB (CHROMA_PERSIST_DIR) for DATA chunk lookup. Copybook resolution uses
 repo_root (e.g. data/gnucobol-contrib). No mocks.
 
 Author: Shreelakshmi Gopinatha Rao
@@ -21,6 +21,7 @@ try:
 except ImportError:
     pass
 
+from legacylens.config.constants import CHROMA_PERSIST_DIR
 from legacylens.retrieval.context_assembler import assemble_context
 
 
@@ -29,8 +30,7 @@ def _chroma_ready() -> bool:
         import chromadb  # noqa: F401
     except ImportError:
         return False
-    chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
-    return os.path.isdir(chroma_dir)
+    return os.path.isdir(CHROMA_PERSIST_DIR)
 
 
 # Default repo root for tests (relative to project root)

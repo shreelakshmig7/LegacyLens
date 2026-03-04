@@ -31,7 +31,6 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 
 import hashlib
 import logging
-import os
 import pathlib
 import re
 import uuid
@@ -72,8 +71,8 @@ def _get_collection():
     """
     import chromadb  # type: ignore
 
-    persist_dir = os.getenv("CHROMA_PERSIST_DIR", CHROMA_PERSIST_DIR)
-    client = chromadb.PersistentClient(path=persist_dir)
+    # Path from config only — never hardcoded (local: ./chroma_db, Railway: /data/chroma_db via env)
+    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
     collection = client.get_or_create_collection(
         name=_COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"},
