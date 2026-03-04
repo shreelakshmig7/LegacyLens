@@ -2,6 +2,9 @@
 # Python dependencies
 # Pin major versions; patch versions float so security fixes apply automatically.
 
+# ── Install the legacylens package itself (required for Railway deployment) ────
+-e .
+
 # ── Web framework ──────────────────────────────────────────────────────────────
 fastapi>=0.111.0,<0.112.0
 uvicorn[standard]>=0.29.0,<0.30.0
