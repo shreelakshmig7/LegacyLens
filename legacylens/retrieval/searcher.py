@@ -69,6 +69,12 @@ def _build_bm25_index() -> Tuple[List[str], List[Dict[str, Any]], Any]:
         documents = documents + [""] * (len(metadatas) - len(documents))
 
     corpus_tokens = [_tokenize(d) for d in documents]
+
+    if not corpus_tokens:
+        logger.warning("BM25 index skipped: ChromaDB collection is empty (no documents ingested yet).")
+        _bm25_state = ([], [], [], None)
+        return [], [], None
+
     bm25 = BM25Okapi(corpus_tokens)
     _bm25_state = (corpus_tokens, documents, metadatas, bm25)
     logger.info("BM25 index built from %d Chroma documents", len(documents))
@@ -83,7 +89,7 @@ def _bm25_search(query: str, top_k: int) -> List[Dict[str, Any]]:
         logger.exception("BM25 index build failed: %s", exc)
         return []
 
-    if not documents:
+    if not documents or bm25 is None:
         return []
 
     query_tokens = _tokenize(query)
