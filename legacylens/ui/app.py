@@ -336,13 +336,18 @@ def main() -> None:
     st.sidebar.markdown("---")
     _render_sidebar_eval()
 
-    # Main: query input
-    query = st.text_input(
-        "Ask about the codebase",
-        key=KEY_QUERY_INPUT,
-        placeholder="e.g. Where is the main entry point of this program?",
-    )
-    # Do not assign to st.session_state[KEY_QUERY_INPUT] after the widget — Streamlit owns it when key= is set.
+    # Main: query input inside a form so Enter key submits (Streamlit form submit on Enter)
+    with st.form("search_form", clear_on_submit=False):
+        query = st.text_input(
+            "Ask about the codebase",
+            key=KEY_QUERY_INPUT,
+            placeholder="e.g. Where is the main entry point of this program?",
+            label_visibility="visible",
+        )
+        search_clicked = st.form_submit_button("Search")
+    if search_clicked:
+        st.session_state[KEY_RUN_SEARCH] = True
+        st.rerun()
 
     # Example questions: 2 rows of 3
     st.markdown("**Try these examples:**")
@@ -372,10 +377,6 @@ def main() -> None:
         if st.button(EXAMPLE_QUESTIONS[5], key="ex5"):
             st.session_state[KEY_PENDING_EXAMPLE] = EXAMPLE_QUESTIONS[5]
             st.rerun()
-
-    search_clicked = st.button("Search", key="search_btn")
-    if search_clicked:
-        st.session_state[KEY_RUN_SEARCH] = True
 
     # Run search when Search clicked or example triggered
     if st.session_state.get(KEY_RUN_SEARCH) and (query or st.session_state.get(KEY_QUERY_INPUT)):
