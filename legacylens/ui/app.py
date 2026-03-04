@@ -52,6 +52,8 @@ KEY_PENDING_EXAMPLE = "pending_example_query"  # Set by example buttons; applied
 KEY_LAST_METADATA = "last_metadata"
 KEY_LAST_ANSWER = "last_answer"
 KEY_STREAM_ERROR = "stream_error"
+KEY_SEARCH_RAN_THIS_RUN = "_search_ran_this_run"
+KEY_SKIP_NEXT_LAST_RESULT = "_skip_next_last_result"
 
 
 def _init_session_state() -> None:
@@ -377,6 +379,10 @@ def main() -> None:
 
     # Run search when Search clicked or example triggered
     if st.session_state.get(KEY_RUN_SEARCH) and (query or st.session_state.get(KEY_QUERY_INPUT)):
+        st.session_state[KEY_SEARCH_RAN_THIS_RUN] = True
+        st.session_state[KEY_SKIP_NEXT_LAST_RESULT] = True  # avoid duplicate on next rerun
+        st.session_state[KEY_LAST_METADATA] = None
+        st.session_state[KEY_LAST_ANSWER] = ""
         q = query or st.session_state.get(KEY_QUERY_INPUT, "")
         st.session_state[KEY_RUN_SEARCH] = False
         if not q.strip():
@@ -412,8 +418,11 @@ def main() -> None:
                     st.session_state[KEY_LAST_ANSWER] = answer_text
                     st.session_state[KEY_LAST_METADATA] = None
 
-    # Show last result on rerun when no new search (e.g. after eval refresh)
-    if not st.session_state.get(KEY_RUN_SEARCH) and st.session_state.get(KEY_LAST_METADATA):
+    # Show last result when we didn't run a search this run; skip one run after a search to avoid duplicate
+    skip_next = st.session_state.pop(KEY_SKIP_NEXT_LAST_RESULT, None)
+    if skip_next:
+        pass  # skip showing last result this run (immediate rerun after search)
+    elif st.session_state.get(KEY_LAST_METADATA):
         st.subheader("Answer")
         st.markdown(st.session_state.get(KEY_LAST_ANSWER, ""))
         st.subheader("Retrieved chunks")
