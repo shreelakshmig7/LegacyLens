@@ -3,8 +3,9 @@ main.py
 -------
 LegacyLens — RAG System for Legacy Enterprise Codebases — FastAPI application
 -----------------------------------------------------------------------------
-FastAPI app exposing POST /query and POST /query/stream. Pipeline: sanitize →
-out-of-scope check → search → rerank → assemble_context → generate_answer (or stream).
+FastAPI app exposing POST /query, POST /query/stream, and POST /admin/ingest.
+Pipeline: sanitize → out-of-scope check → search → rerank → assemble_context →
+generate_answer (or stream).
 Returns structured JSON: answer, chunks, file_paths, line_numbers, github_links, relevance_scores.
 All API keys via environment variables.
 
@@ -15,6 +16,8 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 import json
 import logging
 import os
+import subprocess
+import threading
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -26,7 +29,7 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -244,3 +247,130 @@ def query_stream(request: QueryRequest):
             status_code=500,
             content={"success": False, "error": f"Stream failed: {exc}"},
         )
+
+
+# ---------------------------------------------------------------------------
+# Admin: ingestion endpoint (one-time use to populate Railway ChromaDB volume)
+# ---------------------------------------------------------------------------
+
+_ingest_state: Dict[str, Any] = {"running": False, "last_result": None}
+
+
+def _run_ingestion_background(clone_dest: str) -> None:
+    """
+    Clone gnucobol-contrib and run the full ingestion pipeline in a background thread.
+    Writes progress to Railway logs. Sets REPO_PATH so the pipeline finds the data.
+
+    Args:
+        clone_dest: Absolute path where the repo will be cloned.
+    """
+    _ingest_state["running"] = True
+    _ingest_state["last_result"] = None
+    try:
+        repo_owner = os.getenv("REPO_OWNER", "shreelakshmig7")
+        repo_name = os.getenv("REPO_NAME", "gnucobol-contrib")
+        clone_url = f"https://github.com/{repo_owner}/{repo_name}.git"
+
+        if not Path(clone_dest).exists():
+            logger.info("[ingest] Cloning %s → %s", clone_url, clone_dest)
+            subprocess.run(
+                ["git", "clone", "--depth=1", clone_url, clone_dest],
+                check=True,
+                timeout=300,
+            )
+            logger.info("[ingest] Clone complete.")
+        else:
+            logger.info("[ingest] Repo already present at %s — skipping clone.", clone_dest)
+
+        os.environ["REPO_PATH"] = clone_dest
+        logger.info("[ingest] REPO_PATH set to %s. Starting ingestion pipeline...", clone_dest)
+
+        from legacylens.ingestion.runner import run_ingestion
+        result = run_ingestion(clone_dest)
+        _ingest_state["last_result"] = result
+        if result.get("success"):
+            data = result.get("data") or {}
+            logger.info(
+                "[ingest] SUCCESS — %d chunks stored, %d files, %.1fs total.",
+                data.get("chunks_embedded", 0),
+                data.get("files_discovered", 0),
+                (data.get("timing_path") and 0) or 0,
+            )
+        else:
+            logger.error("[ingest] FAILED — %s", result.get("error"))
+    except subprocess.CalledProcessError as exc:
+        logger.exception("[ingest] git clone failed: %s", exc)
+        _ingest_state["last_result"] = {"success": False, "error": f"Clone failed: {exc}"}
+    except Exception as exc:
+        logger.exception("[ingest] Ingestion failed: %s", exc)
+        _ingest_state["last_result"] = {"success": False, "error": str(exc)}
+    finally:
+        _ingest_state["running"] = False
+
+
+@app.post("/admin/ingest")
+def admin_ingest(request: Request) -> JSONResponse:
+    """
+    Trigger ingestion pipeline on Railway to populate the ChromaDB volume.
+
+    Protected by INGEST_SECRET env var. Pass token as: Authorization: Bearer <token>.
+    Runs in background thread — returns immediately; check Railway logs for progress.
+    Call GET /admin/ingest/status to poll completion.
+
+    Args:
+        request: FastAPI Request (reads Authorization header).
+
+    Returns:
+        202 {"status": "started"} — ingestion launched in background.
+        200 {"status": "already_running"} — previous ingestion still in progress.
+        401 — missing or wrong secret.
+        500 — unexpected error.
+    """
+    secret = os.getenv("INGEST_SECRET", "")
+    auth_header = request.headers.get("Authorization", "")
+    if not secret or auth_header != f"Bearer {secret}":
+        return JSONResponse(status_code=401, content={"error": "Unauthorized — set INGEST_SECRET in Railway Variables."})
+
+    if _ingest_state["running"]:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "already_running", "message": "Ingestion is still in progress. Check Railway logs."},
+        )
+
+    clone_dest = "/app/data/gnucobol-contrib"
+    thread = threading.Thread(target=_run_ingestion_background, args=(clone_dest,), daemon=True)
+    thread.start()
+    logger.info("[ingest] Background ingestion thread started. Clone dest: %s", clone_dest)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "started",
+            "message": "Ingestion running in background. Check Railway deploy logs for progress (~5-10 min).",
+            "clone_dest": clone_dest,
+        },
+    )
+
+
+@app.get("/admin/ingest/status")
+def admin_ingest_status(request: Request) -> JSONResponse:
+    """
+    Poll ingestion status. Same auth as POST /admin/ingest.
+
+    Returns:
+        200 with running=True/False and last_result summary.
+    """
+    secret = os.getenv("INGEST_SECRET", "")
+    auth_header = request.headers.get("Authorization", "")
+    if not secret or auth_header != f"Bearer {secret}":
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    last = _ingest_state.get("last_result")
+    return JSONResponse(
+        status_code=200,
+        content={
+            "running": _ingest_state["running"],
+            "last_result_success": last.get("success") if last else None,
+            "last_result_error": last.get("error") if last else None,
+        },
+    )
