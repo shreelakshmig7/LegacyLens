@@ -191,10 +191,9 @@ LegacyLens/
 3. Set all environment variables from `.env.example` in the Railway dashboard (for both services, or as shared variables). For the UI, set `LEGACYLENS_API_URL` to your **API service’s public URL** (e.g. `https://legacylens-api-production-….up.railway.app`).
 4. Add a Railway volume to the **API** service and set `CHROMA_PERSIST_DIR` to the volume mount path so ChromaDB data survives redeploys.
 5. **API service (legacylens-api):** Use the repo’s Procfile (default). It runs `uvicorn … --host 0.0.0.0 --port $PORT`. If you set a custom start command, use: `uvicorn legacylens.api.main:app --host 0.0.0.0 --port $PORT`.
-6. **UI service (legacylens-ui):** Set the start command so Streamlit binds to `0.0.0.0` and `$PORT`, or use the provided script:
-   - **Start Command:** `sh scripts/run_ui_railway.sh`  
-   - Or: `streamlit run legacylens/ui/app.py --server.port=$PORT --server.address=0.0.0.0`
-   Without this, the UI can show 502 Bad Gateway because it isn’t listening on the port Railway expects.
+6. **UI service (legacylens-ui):** Use the **script** so `PORT` is always expanded (Railway may not expand `$PORT` in a raw start command, so Streamlit can end up on the wrong port → 502):
+   - **Start Command:** `sh scripts/run_ui_railway.sh`
+   - Do **not** use the raw `streamlit run ... --server.port=$PORT` command; use the script instead.
 7. Railway auto-deploys on each push to `main`.
 
 ---
