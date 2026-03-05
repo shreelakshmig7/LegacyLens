@@ -12,7 +12,9 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 
 import json
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
@@ -317,6 +319,24 @@ class TestApiFileContentEndpoint(unittest.TestCase):
         self.assertIn("path", data)
         self.assertIsInstance(data["content"], str)
         self.assertGreater(len(data["content"]), 0)
+
+    def test_file_content_resolves_via_repo_path_outside_project_root(self) -> None:
+        """GET /file/content succeeds when REPO_PATH is outside project root and path is under repo."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            subdir = repo_root / "samples" / "example"
+            subdir.mkdir(parents=True)
+            sample_file = subdir / "test.cbl"
+            sample_file.write_text("       IDENTIFICATION DIVISION.\n       PROGRAM-ID. TEST.\n", encoding="utf-8")
+            rel_path = "samples/example/test.cbl"
+            with patch.dict(os.environ, {"REPO_PATH": str(repo_root)}, clear=False):
+                client = TestClient(_get_app())
+                response = client.get(f"/file/content?path={rel_path}")
+            self.assertEqual(response.status_code, 200, response.text)
+            data = response.json()
+            self.assertTrue(data.get("success"), data)
+            self.assertIn("content", data)
+            self.assertIn("IDENTIFICATION DIVISION", data["content"])
 
 
 class TestApiRepoPathDefault(unittest.TestCase):

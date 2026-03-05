@@ -106,11 +106,12 @@ def _resolve_and_validate_file_path(relative_path: str) -> Dict[str, Any]:
     if not resolved.exists():
         repo_path = os.getenv("REPO_PATH", "").strip()
         if repo_path:
-            alt = (Path(repo_path) / path_str).resolve()
+            repo_root = Path(repo_path).resolve()
+            alt = (repo_root / path_str).resolve()
             try:
-                alt.relative_to(_PROJECT_ROOT.resolve())
+                alt.relative_to(repo_root)
             except ValueError:
-                return {"success": False, "path": None, "error": "Path resolves outside project root"}
+                return {"success": False, "path": None, "error": "Path resolves outside repo"}
             if alt.exists() and alt.is_file():
                 resolved = alt
         if not resolved.exists():
