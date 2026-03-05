@@ -495,6 +495,35 @@ def _has_retrieved_chunks(metadata: Optional[Dict[str, Any]]) -> bool:
     return any(isinstance(chunk, str) and chunk.strip() for chunk in chunks)
 
 
+def _is_not_found_answer(answer_text: Optional[str]) -> bool:
+    """
+    Return True when the answer indicates nothing was found or context doesn't answer the question.
+
+    Used to hide the "Retrieved chunks" section when the answer is a not-found /
+    out-of-scope / context-doesn't-answer style response (matches answer_generator templates).
+
+    Args:
+        answer_text: The generated answer string.
+
+    Returns:
+        bool: True if the answer is a not-found style response.
+    """
+    if not answer_text or not isinstance(answer_text, str):
+        return False
+    lower = answer_text.lower()
+    if "not found" not in lower:
+        return False
+    markers = (
+        "indexed codebase",
+        "outside the scope",
+        "requested information",
+        "retrieved context",
+        "no matching paragraph",
+        "retrieved chunks",
+    )
+    return any(m in lower for m in markers)
+
+
 def main() -> None:
     """Build Streamlit layout: sidebar (About, Eval), main (query, examples, results)."""
     st.set_page_config(
@@ -593,18 +622,20 @@ def main() -> None:
                 st.error(st.session_state[KEY_STREAM_ERROR])
             else:
                 st.session_state[KEY_LAST_ANSWER] = answer_text
-                if metadata:
-                    if _has_retrieved_chunks(metadata):
-                        st.session_state[KEY_LAST_METADATA] = metadata
-                    else:
-                        st.session_state[KEY_LAST_METADATA] = None
+                show_chunks = (
+                    metadata
+                    and _has_retrieved_chunks(metadata)
+                    and not _is_not_found_answer(answer_text)
+                )
+                if show_chunks:
+                    st.session_state[KEY_LAST_METADATA] = metadata
                 else:
                     st.session_state[KEY_LAST_METADATA] = None
 
                 with result_placeholder.container():
                     st.subheader("Answer")
                     st.markdown(answer_text or "(No answer returned.)")
-                if metadata and _has_retrieved_chunks(metadata):
+                if show_chunks:
                     with chunks_placeholder.container():
                         with st.expander("Retrieved chunks", expanded=False):
                             _render_chunks(metadata, base_url=LEGACYLENS_API_URL)
@@ -620,7 +651,11 @@ def main() -> None:
     elif st.session_state.get(KEY_LAST_ANSWER):
         st.subheader("Answer")
         st.markdown(st.session_state[KEY_LAST_ANSWER])
-        if st.session_state.get(KEY_LAST_METADATA):
+        last_answer = st.session_state.get(KEY_LAST_ANSWER) or ""
+        if (
+            st.session_state.get(KEY_LAST_METADATA)
+            and not _is_not_found_answer(last_answer)
+        ):
             with st.expander("Retrieved chunks", expanded=False):
                 _render_chunks(st.session_state[KEY_LAST_METADATA], base_url=LEGACYLENS_API_URL)
 
