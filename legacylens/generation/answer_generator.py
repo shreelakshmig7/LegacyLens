@@ -155,7 +155,11 @@ _NOT_FOUND_TEMPLATE = (
     "The requested information was not found in the indexed codebase. "
     "No matching paragraph or code section exists in the retrieved chunks for this query. "
     "There is no relevant file path or line number to cite because the context "
-    "does not contain code related to this topic."
+    "does not contain code related to this topic. "
+    "Try rephrasing your query with a specific file name, paragraph name, or "
+    "operation keyword (for example: CALL, COPY, USING, READ, WRITE). "
+    "You can also ask for the same intent in a narrower form, such as "
+    "'Where is <paragraph-name> defined?' or 'Which file contains <keyword>?'."
 )
 
 # Anchor used for fallback file_path normalization when REPO_PATH is not set.
@@ -186,6 +190,87 @@ _INJECTION_PATTERNS: List[str] = [
     "###",
     "---",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Translation hints toggle
+# ---------------------------------------------------------------------------
+
+def _translation_hints_enabled(query: str) -> bool:
+    """
+    Return True when the user explicitly asks for modernization/translation hints.
+
+    Args:
+        query: User query string (already sanitized or raw).
+
+    Returns:
+        bool: True when translation hints should be enabled for this request.
+    """
+    if not query:
+        return False
+    lower = query.lower()
+    trigger_terms = (
+        "translation hint",
+        "translation hints",
+        "translate this",
+        "modernize",
+        "equivalent in python",
+        "equivalent in java",
+        "equivalent in go",
+    )
+    return any(term in lower for term in trigger_terms)
+
+
+# ---------------------------------------------------------------------------
+# Citation validation + fallback
+# ---------------------------------------------------------------------------
+
+def _has_required_citations(answer: str) -> bool:
+    """
+    Validate that the answer includes required citation phrases.
+
+    Args:
+        answer: Generated answer text.
+
+    Returns:
+        bool: True only when both required phrases are present.
+    """
+    if not answer:
+        return False
+    lower = answer.lower()
+    return "file path" in lower and "line number" in lower
+
+
+def _build_citation_fallback(assembled_results: List[Dict[str, Any]]) -> str:
+    """
+    Build deterministic fallback text that includes required citation phrases.
+
+    Args:
+        assembled_results: Retrieved/assembled results used for generation.
+
+    Returns:
+        str: Fallback answer with file path and line number references.
+    """
+    if not assembled_results:
+        return _NOT_FOUND_TEMPLATE
+    top = assembled_results[0]
+    meta = top.get("metadata") or {}
+    file_path = _normalize_file_path((meta.get("file_path") or "").strip())
+    start_line = _parse_line_range(meta.get("line_range") or "")
+    paragraph_name = (meta.get("paragraph_name") or "").strip()
+    if paragraph_name:
+        return (
+            f"Based on the retrieved context, the most relevant paragraph is {paragraph_name}. "
+            f"The file path is {file_path} and the line number is {start_line}. "
+            "This fallback is returned because the generated answer did not include "
+            "the required citation phrases."
+        )
+    return (
+        "Based on the retrieved context, the top matching code region was identified. "
+        f"The file path is {file_path} and the line number is {start_line}. "
+        "This fallback is returned because the generated answer did not include "
+        "the required citation phrases."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +391,45 @@ def _parse_line_range(raw: Any) -> int:
     except (ValueError, IndexError):
         pass
     return 0
+
+
+def _parse_line_range_tuple(raw: Any) -> tuple:
+    """
+    Parse ChromaDB line_range metadata and return (start, end) for highlighting.
+
+    Args:
+        raw: Raw line_range value (e.g. "[42, 89]" or "[77, 77]").
+
+    Returns:
+        tuple: (start_line, end_line); (0, 0) if parsing fails.
+    """
+    if raw is None:
+        return (0, 0)
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        return (int(raw[0]), int(raw[1]))
+    raw_str = str(raw).strip()
+    if not raw_str:
+        return (0, 0)
+    try:
+        parsed = ast.literal_eval(raw_str)
+        if isinstance(parsed, (list, tuple)) and len(parsed) >= 2:
+            return (int(parsed[0]), int(parsed[1]))
+        if isinstance(parsed, (list, tuple)) and len(parsed) == 1:
+            s = int(parsed[0])
+            return (s, s)
+        if isinstance(parsed, (int, float)):
+            s = int(parsed)
+            return (s, s)
+    except (ValueError, SyntaxError, TypeError):
+        pass
+    try:
+        parts = raw_str.strip("[]").split(",")
+        start = int(parts[0].strip()) if parts else 0
+        end = int(parts[1].strip()) if len(parts) > 1 else start
+        return (start, end)
+    except (ValueError, IndexError):
+        pass
+    return (0, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -456,9 +580,11 @@ def _build_messages(
         context_blocks.append(_format_context_block(result, i))
 
     context_text = "\n\n".join(context_blocks) if context_blocks else "(no context retrieved)"
+    translation_mode = "enabled" if _translation_hints_enabled(query) else "disabled"
 
     user_content = (
         f"Query: {query}\n\n"
+        f"Translation hints: {translation_mode}\n\n"
         f"CONTEXT:\n{context_text}"
     )
 
@@ -631,6 +757,12 @@ def generate_answer(
 
         messages = _build_messages(query, assembled_results)
         answer = _call_with_backoff(messages)
+        if assembled_results and not _has_required_citations(answer):
+            logger.warning(
+                "Answer missing required citation phrases; using deterministic fallback for query: %.60s",
+                query,
+            )
+            answer = _build_citation_fallback(assembled_results)
         logger.info("Answer generated (%d chars) for query: %.60s", len(answer), query)
         return {"success": True, "answer": answer}
 

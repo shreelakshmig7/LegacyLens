@@ -73,10 +73,8 @@ QUERY_EXPANSION_TERMS: dict = {
     # broader keys like "file section" or "structured in the data division" cause retrieval
     # regressions by shifting embeddings away from mmapmatchfile.cbl. ll-009 answer quality
     # is handled exclusively via the system prompt FD quoting instruction.
-    # ll-013: query expansion for "using clause"/"pass parameters" was attempted but caused
-    # a retrieval regression (wrong chunks retrieved). ll-013 is accepted as a known limitation:
-    # the correct chunk's relevance score falls below NOT_FOUND_SCORE_THRESHOLD (0.55), so the
-    # fast-path triggers and the LLM is not called. Addressed in post-MVP with threshold tuning.
+    # ll-013: "USING clause" dependency queries rely primarily on retrieval fallback logic
+    # in searcher.py (BM25 triggers when vector max score is below relevance threshold).
 }
 
 # ── COBOL Preprocessing ────────────────────────────────────────────────────────
@@ -92,9 +90,9 @@ CHUNK_OVERLAP_TOKENS: int = 50
 # ── Embedding ──────────────────────────────────────────────────────────────────
 EMBEDDING_MODEL: str = "voyage-code-2"
 EMBEDDING_DIMENSIONS: int = 1536
-INGESTION_BATCH_SIZE: int = 300
-VOYAGE_API_TIMEOUT_SECONDS: int = 30  # Max wait per embedding API call; prevents eval hang
-EMBEDDING_BATCH_WORKERS: int = int(os.getenv("EMBEDDING_BATCH_WORKERS", "2"))
+INGESTION_BATCH_SIZE: int = 128
+VOYAGE_API_TIMEOUT_SECONDS: int = 60  # Max wait per embedding API call; prevents eval hang
+EMBEDDING_BATCH_WORKERS: int = int(os.getenv("EMBEDDING_BATCH_WORKERS", "3"))
 
 # ── Query Safety ──────────────────────────────────────────────────────────────
 # Terms whose presence in a query signals the question is outside the domain of
@@ -162,6 +160,8 @@ METADATA_FIELDS: List[str] = [
     "parent_section",
     "paragraph_name",
     "dependencies",
+    "file_hash",       # SHA-256 of raw file bytes — recommended PRD §3.4
+    "security_flag",   # True when PII was detected/redacted — recommended PRD §3.4
 ]
 MANDATORY_METADATA_FIELDS: List[str] = [
     "file_path",
@@ -195,6 +195,75 @@ PROGRAM_CATEGORIES: List[str] = [
 
 # ── COBOL Dependency Keywords ──────────────────────────────────────────────────
 COBOL_DEPENDENCY_KEYWORDS: List[str] = ["CALL", "COPY", "USING"]
+
+# ── File Content API (PRD 9.3 Drill-Down: full file view) ────────────────────
+# Extensions allowed for GET /file/content — PRD 2.1: COBOL + Fortran
+FILE_CONTENT_ALLOWED_EXTENSIONS: tuple = (
+    ".cbl", ".cob", ".cpy",  # COBOL
+    ".f", ".f90", ".for",    # Fortran
+)
+# Max file size in bytes — security: reject oversized files
+MAX_FILE_SIZE_BYTES: int = 1_000_000  # 1 MB
+# Max lines to return — truncate very long files for UI performance
+MAX_FILE_VIEW_LINES: int = 2000
+
+# ── Code Understanding Features (PRD §7) — Query Routing & Token Limits ──────
+# Keywords used by detect_feature_type() to route queries to the correct feature
+# module. Checked in priority order: dependency → explain → business_logic →
+# doc_generate → general.  Lower-priority lists should NOT overlap with higher.
+
+DEPENDENCY_QUERY_KEYWORDS: List[str] = [
+    "dependencies of",
+    "depends on",
+    "what does .* call",
+    "what programs",
+    "what modules",
+    "call chain",
+    "copybooks included",
+    "copy statements",
+    "using clause",
+]
+
+EXPLAIN_QUERY_KEYWORDS: List[str] = [
+    "explain what",
+    "explain the",
+    "explain how",
+    "what does .* do",
+    "what does .* paragraph",
+    "purpose of",
+    "describe the",
+    "how does .* work",
+]
+
+BUSINESS_LOGIC_KEYWORDS: List[str] = [
+    "business rule",
+    "business logic",
+    "validation rule",
+    "validation logic",
+    "conditions and thresholds",
+    "data transformation",
+    "control flow",
+]
+
+DOC_GENERATE_KEYWORDS: List[str] = [
+    "generate doc",
+    "generate documentation",
+    "create documentation",
+    "document the",
+    "auto-document",
+    "write documentation",
+]
+
+FEATURE_TYPE_EXPLAIN: str = "explain"
+FEATURE_TYPE_DEPENDENCY: str = "dependency"
+FEATURE_TYPE_BUSINESS_LOGIC: str = "business_logic"
+FEATURE_TYPE_DOC_GENERATE: str = "doc_generate"
+FEATURE_TYPE_GENERAL: str = "general"
+
+CODE_EXPLAIN_MAX_TOKENS: int = 1000
+DEPENDENCY_MAP_MAX_TOKENS: int = 800
+BUSINESS_LOGIC_MAX_TOKENS: int = 1200
+DOC_GENERATE_MAX_TOKENS: int = 1500
 
 # ── Fields that must never appear in logs ─────────────────────────────────────
 SENSITIVE_LOG_FIELDS: List[str] = ["api_key", "token", "secret"]

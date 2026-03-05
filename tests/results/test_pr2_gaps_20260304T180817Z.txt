@@ -1,0 +1,57 @@
+/Users/shreelakshmigopinatharao/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.23.8, langsmith-0.4.37
+asyncio: mode=strict
+collecting ... collected 20 items
+
+tests/test_ui_app.py::TestInferCodeLanguage::test_cobol_extensions_return_cobol PASSED [  5%]
+tests/test_ui_app.py::TestInferCodeLanguage::test_empty_or_none_returns_cobol PASSED [ 10%]
+tests/test_ui_app.py::TestInferCodeLanguage::test_fortran_extensions_return_fortran PASSED [ 15%]
+tests/test_ui_app.py::TestHasRetrievedChunks::test_empty_chunks_list_returns_false PASSED [ 20%]
+tests/test_ui_app.py::TestHasRetrievedChunks::test_empty_dict_returns_false PASSED [ 25%]
+tests/test_ui_app.py::TestHasRetrievedChunks::test_non_empty_chunk_returns_true PASSED [ 30%]
+tests/test_ui_app.py::TestHasRetrievedChunks::test_none_metadata_returns_false PASSED [ 35%]
+tests/test_ui_app.py::TestHasRetrievedChunks::test_whitespace_only_chunks_returns_false PASSED [ 40%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search PASSED [ 45%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_empty_after_sanitize_returns_400 PASSED [ 50%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_returns_200_and_structured_body PASSED [ 55%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_search_failure_returns_500 PASSED [ 60%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_empty_query_returns_400 PASSED [ 65%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_error_token_format PASSED [ 70%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_first_line_is_json_metadata PASSED [ 75%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_disallowed_extension PASSED [ 80%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_empty_path PASSED [ 85%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_path_traversal PASSED [ 90%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_returns_content_for_valid_path PASSED [ 95%]
+tests/test_api.py::TestApiRepoPathDefault::test_api_repo_path_default PASSED [100%]
+
+=============================== warnings summary ===============================
+../Library/Python/3.9/lib/python/site-packages/starlette/formparsers.py:12
+  /Users/shreelakshmigopinatharao/Library/Python/3.9/lib/python/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search
+  /Users/shreelakshmigopinatharao/LegacyLens/legacylens/api/main.py:118: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search
+  /Users/shreelakshmigopinatharao/Library/Python/3.9/lib/python/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 20 passed, 3 warnings in 0.39s ========================

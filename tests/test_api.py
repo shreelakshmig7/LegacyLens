@@ -73,8 +73,10 @@ class TestApiQueryEndpoint(unittest.TestCase):
     @patch("legacylens.api.main.search")
     @patch("legacylens.api.main._is_out_of_scope")
     @patch("legacylens.api.main._sanitize_query")
+    @patch("legacylens.api.main.detect_feature_type", return_value="general")
     def test_api_query_returns_200_and_structured_body(
         self,
+        mock_detect: MagicMock,
         mock_sanitize: MagicMock,
         mock_ooo: MagicMock,
         mock_search: MagicMock,
@@ -264,6 +266,58 @@ class TestApiQueryStreamEndpoint(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # REPO_PATH default
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# GET /file/content — PRD 9.3 drill-down (full file view)
+# ---------------------------------------------------------------------------
+
+class TestApiFileContentEndpoint(unittest.TestCase):
+    """GET /file/content validates path and returns file content or error."""
+
+    def test_file_content_rejects_empty_path(self) -> None:
+        """GET /file/content with empty path returns 400."""
+        client = TestClient(_get_app())
+        response = client.get("/file/content")
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("error", data)
+
+    def test_file_content_rejects_path_traversal(self) -> None:
+        """GET /file/content rejects path with .. (directory traversal)."""
+        client = TestClient(_get_app())
+        response = client.get("/file/content?path=../../../etc/passwd")
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("error", data)
+        self.assertIn("traversal", data["error"].lower() or "invalid" in data["error"].lower())
+
+    def test_file_content_rejects_disallowed_extension(self) -> None:
+        """GET /file/content rejects file types not in allowlist."""
+        client = TestClient(_get_app())
+        response = client.get("/file/content?path=data/gnucobol-contrib/README.md")
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn("error", data)
+
+    def test_file_content_returns_content_for_valid_path(self) -> None:
+        """GET /file/content returns success and content for valid COBOL file."""
+        import pathlib
+        project_root = pathlib.Path(__file__).resolve().parent.parent
+        # Use a known file from the repo
+        sample = project_root / "data" / "gnucobol-contrib" / "samples" / "games" / "star_trek" / "ctrek.cob"
+        if not sample.exists():
+            self.skipTest("Sample file ctrek.cob not found (data not cloned)")
+        rel_path = str(sample.relative_to(project_root))
+        client = TestClient(_get_app())
+        response = client.get(f"/file/content?path={rel_path}")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("content", data)
+        self.assertIn("path", data)
+        self.assertIsInstance(data["content"], str)
+        self.assertGreater(len(data["content"]), 0)
+
 
 class TestApiRepoPathDefault(unittest.TestCase):
     """assemble_context is called with repo_root default data/gnucobol-contrib when REPO_PATH unset."""

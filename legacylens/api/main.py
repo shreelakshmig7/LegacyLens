@@ -31,13 +31,24 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from legacylens.config.constants import TOP_K, validate_required_env_vars
+from legacylens.config.constants import (
+    FEATURE_TYPE_EXPLAIN,
+    FEATURE_TYPE_GENERAL,
+    FILE_CONTENT_ALLOWED_EXTENSIONS,
+    MAX_FILE_SIZE_BYTES,
+    MAX_FILE_VIEW_LINES,
+    TOP_K,
+    validate_required_env_vars,
+)
+from legacylens.features import detect_feature_type
+from legacylens.features.code_explainer import explain as _explain_code
 from legacylens.generation.answer_generator import (
     _OUT_OF_SCOPE_TEMPLATE,
     _build_github_link,
     _is_out_of_scope,
     _normalize_file_path,
     _parse_line_range,
+    _parse_line_range_tuple,
     _sanitize_query,
     generate_answer,
     generate_answer_stream,
@@ -50,6 +61,57 @@ logger = logging.getLogger(__name__)
 
 # Default repo root for copybook resolution when REPO_PATH is not set.
 _DEFAULT_REPO_ROOT = "data/gnucobol-contrib"
+
+# Project root: parent of legacylens package
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _resolve_and_validate_file_path(relative_path: str) -> Dict[str, Any]:
+    """
+    Resolve relative path to absolute file; validate security and constraints.
+
+    Rejects: path traversal (..), disallowed extensions, paths outside project,
+    non-existent files, files exceeding MAX_FILE_SIZE_BYTES.
+
+    Args:
+        relative_path: Path relative to project root (e.g. data/gnucobol-contrib/.../file.cbl).
+
+    Returns:
+        dict: {"success": bool, "path": str | None, "error": str | None}
+    """
+    if not relative_path or not isinstance(relative_path, str):
+        return {"success": False, "path": None, "error": "Path is required"}
+    path_str = relative_path.strip()
+    if ".." in path_str or path_str.startswith("/"):
+        return {"success": False, "path": None, "error": "Invalid path: traversal or absolute path not allowed"}
+    ext = Path(path_str).suffix.lower()
+    if ext not in FILE_CONTENT_ALLOWED_EXTENSIONS:
+        return {
+            "success": False,
+            "path": None,
+            "error": f"File type not allowed. Allowed: {', '.join(FILE_CONTENT_ALLOWED_EXTENSIONS)}",
+        }
+    resolved = (_PROJECT_ROOT / path_str).resolve()
+    try:
+        resolved.relative_to(_PROJECT_ROOT.resolve())
+    except ValueError:
+        return {"success": False, "path": None, "error": "Path resolves outside project root"}
+    if not resolved.exists():
+        return {"success": False, "path": None, "error": "File not found"}
+    if not resolved.is_file():
+        return {"success": False, "path": None, "error": "Path is not a file"}
+    try:
+        size = resolved.stat().st_size
+    except OSError as e:
+        return {"success": False, "path": None, "error": f"Cannot read file: {e}"}
+    if size > MAX_FILE_SIZE_BYTES:
+        return {
+            "success": False,
+            "path": None,
+            "error": f"File too large (max {MAX_FILE_SIZE_BYTES} bytes)",
+        }
+    return {"success": True, "path": str(resolved), "error": None}
+
 
 app = FastAPI(
     title="LegacyLens API",
@@ -68,6 +130,46 @@ def _startup_validate_env() -> None:
         )
 
 
+@app.get("/file/content")
+def file_content(path: str = ""):
+    """
+    Return full file content for PRD 9.3 drill-down (full file view with highlighted lines).
+
+    Path must be relative to project root, use allowed extensions, and pass security checks.
+
+    Args:
+        path: Query param — relative path (e.g. data/gnucobol-contrib/samples/.../file.cbl).
+
+    Returns:
+        200: {"success": True, "content": str, "path": str}
+        400/500: {"success": False, "error": str}
+    """
+    result = _resolve_and_validate_file_path(path)
+    if not result["success"]:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": result["error"]},
+        )
+    file_path = result["path"]
+    try:
+        content = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except OSError as e:
+        logger.warning("Failed to read file %s: %s", file_path, e)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Cannot read file: {e}"},
+        )
+    lines = content.splitlines()
+    if len(lines) > MAX_FILE_VIEW_LINES:
+        lines = lines[:MAX_FILE_VIEW_LINES]
+        content = "\n".join(lines) + "\n\n... (truncated)"
+    return {
+        "success": True,
+        "content": content,
+        "path": path,
+    }
+
+
 class QueryRequest(BaseModel):
     """Request body for POST /query and POST /query/stream."""
 
@@ -78,17 +180,20 @@ def _build_metadata_from_assembled(
     assembled_results: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Build chunks, file_paths, line_numbers, github_links, relevance_scores from assembled results.
+    Build chunks, file_paths, line_numbers, line_ranges, github_links, relevance_scores.
+
+    line_ranges: [(start, end), ...] per chunk for PRD 9.3 full-file highlighting.
 
     Args:
         assembled_results: List of dicts from assemble_context(); each has text, metadata, score.
 
     Returns:
-        dict: Keys chunks, file_paths, line_numbers, github_links, relevance_scores (lists).
+        dict: Keys chunks, file_paths, line_numbers, line_ranges, github_links, relevance_scores.
     """
     chunks: List[str] = []
     file_paths: List[str] = []
     line_numbers: List[int] = []
+    line_ranges: List[List[int]] = []
     github_links: List[str] = []
     relevance_scores: List[float] = []
 
@@ -96,10 +201,12 @@ def _build_metadata_from_assembled(
         meta = r.get("metadata") or {}
         fp = (meta.get("file_path") or "").strip()
         lr = meta.get("line_range") or ""
+        start, end = _parse_line_range_tuple(lr)
         line_num = _parse_line_range(lr)
         chunks.append((r.get("text") or "").strip())
         file_paths.append(_normalize_file_path(fp))
         line_numbers.append(line_num)
+        line_ranges.append([start, end])
         github_links.append(_build_github_link(fp, str(lr)))
         relevance_scores.append(float(r.get("score", 0.0)))
 
@@ -107,9 +214,44 @@ def _build_metadata_from_assembled(
         "chunks": chunks,
         "file_paths": file_paths,
         "line_numbers": line_numbers,
+        "line_ranges": line_ranges,
         "github_links": github_links,
         "relevance_scores": relevance_scores,
     }
+
+
+def _generate_with_feature_routing(
+    feature_type: str,
+    sanitized: str,
+    assembled: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Dispatch answer generation to the appropriate feature module based on query type.
+
+    Falls through to the default generate_answer() for "general" type and for any
+    feature type whose module is not yet implemented.
+
+    Args:
+        feature_type: One of the FEATURE_TYPE_* constants from detect_feature_type().
+        sanitized: The sanitized query string.
+        assembled: Assembled context results from the retrieval pipeline.
+
+    Returns:
+        dict: {"success": bool, "answer": str, ...} — same schema as generate_answer().
+    """
+    if feature_type == FEATURE_TYPE_GENERAL:
+        return generate_answer(sanitized, assembled)
+
+    if feature_type == FEATURE_TYPE_EXPLAIN:
+        logger.info("Feature routing: explain for query: %.60s", sanitized)
+        result = _explain_code(sanitized)
+        return {
+            "success": result.get("success", False),
+            "answer": result.get("explanation", ""),
+        }
+
+    logger.info("Feature routing: type=%s for query: %.60s", feature_type, sanitized)
+    return generate_answer(sanitized, assembled)
 
 
 def _stream_query_response(sanitized: str, assembled: List[Dict[str, Any]]):
@@ -150,9 +292,12 @@ def query(request: QueryRequest):
                 "chunks": meta["chunks"],
                 "file_paths": meta["file_paths"],
                 "line_numbers": meta["line_numbers"],
+                "line_ranges": meta["line_ranges"],
                 "github_links": meta["github_links"],
                 "relevance_scores": meta["relevance_scores"],
             }
+
+        feature_type = detect_feature_type(sanitized)
 
         search_result = search(sanitized, top_k=TOP_K)
         if not search_result.get("success"):
@@ -166,7 +311,7 @@ def query(request: QueryRequest):
         repo_root = os.getenv("REPO_PATH", _DEFAULT_REPO_ROOT)
         assembled = assemble_context(reranked, repo_root=repo_root)
 
-        gen_result = generate_answer(sanitized, assembled)
+        gen_result = _generate_with_feature_routing(feature_type, sanitized, assembled)
         if not gen_result.get("success"):
             logger.warning(
                 "Answer generation failed, returning retrieval-only fallback: %s",
@@ -182,6 +327,7 @@ def query(request: QueryRequest):
                 "chunks": meta["chunks"],
                 "file_paths": meta["file_paths"],
                 "line_numbers": meta["line_numbers"],
+                "line_ranges": meta["line_ranges"],
                 "github_links": meta["github_links"],
                 "relevance_scores": meta["relevance_scores"],
             }
@@ -192,6 +338,7 @@ def query(request: QueryRequest):
             "chunks": meta["chunks"],
             "file_paths": meta["file_paths"],
             "line_numbers": meta["line_numbers"],
+            "line_ranges": meta["line_ranges"],
             "github_links": meta["github_links"],
             "relevance_scores": meta["relevance_scores"],
         }

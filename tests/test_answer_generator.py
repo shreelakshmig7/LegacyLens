@@ -120,6 +120,34 @@ class TestParseLineRange(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _parse_line_range_tuple (PRD 9.3 full-file highlighting)
+# ---------------------------------------------------------------------------
+
+class TestParseLineRangeTuple(unittest.TestCase):
+    """Unit tests for line_range → (start, end) tuple parser."""
+
+    def setUp(self) -> None:
+        from legacylens.generation.answer_generator import _parse_line_range_tuple
+        self._fn = _parse_line_range_tuple
+
+    def test_standard_list_string(self) -> None:
+        """'[42, 89]' → (42, 89)."""
+        self.assertEqual(self._fn("[42, 89]"), (42, 89))
+
+    def test_single_element_list(self) -> None:
+        """'[10]' → (10, 10)."""
+        self.assertEqual(self._fn("[10]"), (10, 10))
+
+    def test_none_input(self) -> None:
+        """None input → (0, 0)."""
+        self.assertEqual(self._fn(None), (0, 0))  # type: ignore[arg-type]
+
+    def test_empty_string(self) -> None:
+        """Empty string → (0, 0)."""
+        self.assertEqual(self._fn(""), (0, 0))
+
+
+# ---------------------------------------------------------------------------
 # _build_github_link
 # ---------------------------------------------------------------------------
 
@@ -311,7 +339,9 @@ class TestGenerateAnswerFastPath(unittest.TestCase):
             out = generate_answer("What modifies CUSTOMER-RECORD?", results)
         mock_llm.assert_called_once()
         self.assertTrue(out["success"])
-        self.assertEqual(out["answer"], mock_response)
+        # PRD-8 hardening: uncited outputs are replaced with deterministic cited fallback.
+        self.assertIn("file path", out["answer"].lower())
+        self.assertIn("line number", out["answer"].lower())
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +376,17 @@ class TestGenerateAnswerContract(unittest.TestCase):
             out = generate_answer("anything", [])
         self.assertTrue(out["success"])
         self.assertIn("not found", out["answer"].lower())
+
+    def test_not_found_response_includes_rephrase_suggestions(self) -> None:
+        """Not-found response must include generic query reformulation suggestions."""
+        from legacylens.generation.answer_generator import generate_answer
+        with patch("legacylens.generation.answer_generator._call_with_backoff"):
+            out = generate_answer("anything", [])
+        answer_lower = out["answer"].lower()
+        self.assertIn("not found", answer_lower)
+        self.assertIn("try rephrasing", answer_lower)
+        self.assertIn("file name", answer_lower)
+        self.assertIn("paragraph", answer_lower)
 
     def test_success_false_on_llm_exception(self) -> None:
         """If backoff exhausted, return success=False with error message."""
@@ -844,3 +885,53 @@ class TestStreamingStatusTokens(unittest.TestCase):
                    return_value="The paragraph is at line number 42."):
             out = generate_answer("Where is main?", results)
         self.assertNotIn("__STATUS__", out["answer"])
+
+
+# ===========================================================================
+# Feature 4 — PRD Section 8 hardening (translation hints + citation validator)
+# ===========================================================================
+
+class TestTranslationHintsPromptRouting(unittest.TestCase):
+    """Prompt must explicitly state whether translation hints are enabled."""
+
+    def test_prompt_marks_translation_hints_disabled_by_default(self) -> None:
+        """Normal queries must keep translation hints disabled."""
+        from legacylens.generation.answer_generator import _build_messages
+        msgs = _build_messages("Where is the main entry point?", [_make_result(score=0.9)])
+        user_msg = [m for m in msgs if m["role"] == "user"][0]["content"].lower()
+        self.assertIn("translation hints: disabled", user_msg)
+
+    def test_prompt_marks_translation_hints_enabled_when_requested(self) -> None:
+        """Queries explicitly asking for translation hints must enable them."""
+        from legacylens.generation.answer_generator import _build_messages
+        q = "Give me translation hints to modernize this COBOL logic to python"
+        msgs = _build_messages(q, [_make_result(score=0.9)])
+        user_msg = [m for m in msgs if m["role"] == "user"][0]["content"].lower()
+        self.assertIn("translation hints: enabled", user_msg)
+
+
+class TestCitationEnforcement(unittest.TestCase):
+    """Generated answers must include file path and line number (PRD 8.2/8.3)."""
+
+    def test_generate_answer_rewrites_uncited_llm_output(self) -> None:
+        """If LLM output misses required citation phrases, generator must return fallback with citations."""
+        from legacylens.generation.answer_generator import generate_answer
+        results = [_make_result(score=0.95)]
+        with patch("legacylens.generation.answer_generator._call_with_backoff",
+                   return_value="This modifies customer records in update logic."):
+            out = generate_answer("What modifies CUSTOMER-RECORD?", results)
+        answer_lower = out["answer"].lower()
+        self.assertIn("file path", answer_lower)
+        self.assertIn("line number", answer_lower)
+
+    def test_generate_answer_keeps_valid_cited_output(self) -> None:
+        """If LLM output already includes required citation phrases, keep it unchanged."""
+        from legacylens.generation.answer_generator import generate_answer
+        results = [_make_result(score=0.95)]
+        valid = (
+            "The paragraph updates the record. "
+            "The file path is data/gnucobol-contrib/samples/cust01.cbl and the line number is 42."
+        )
+        with patch("legacylens.generation.answer_generator._call_with_backoff", return_value=valid):
+            out = generate_answer("What modifies CUSTOMER-RECORD?", results)
+        self.assertEqual(out["answer"], valid)

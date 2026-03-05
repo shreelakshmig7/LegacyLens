@@ -12,6 +12,7 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
 import glob
+import html
 import json
 import logging
 import os
@@ -22,6 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Load .env from project root so LEGACYLENS_API_URL (e.g. http://localhost:8001) is set
 try:
@@ -31,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from legacylens.config.constants import LEGACYLENS_API_URL
+from legacylens.config.constants import FORTRAN_EXTENSIONS, LEGACYLENS_API_URL
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ KEY_LAST_ANSWER = "last_answer"
 KEY_STREAM_ERROR = "stream_error"
 KEY_SEARCH_RAN_THIS_RUN = "_search_ran_this_run"
 KEY_SKIP_NEXT_LAST_RESULT = "_skip_next_last_result"
+KEY_SELECTED_CHUNK_INDEX = "_selected_chunk_index"  # Pre-Search 12: user selects most relevant
 
 
 def _init_session_state() -> None:
@@ -68,6 +71,8 @@ def _init_session_state() -> None:
         st.session_state[KEY_LAST_ANSWER] = ""
     if KEY_STREAM_ERROR not in st.session_state:
         st.session_state[KEY_STREAM_ERROR] = None
+    if KEY_SELECTED_CHUNK_INDEX not in st.session_state:
+        st.session_state[KEY_SELECTED_CHUNK_INDEX] = None
     # Apply pending example before text_input is drawn (Streamlit forbids modifying query_input after widget creation)
     if KEY_PENDING_EXAMPLE in st.session_state:
         st.session_state[KEY_QUERY_INPUT] = st.session_state.pop(KEY_PENDING_EXAMPLE)
@@ -298,26 +303,188 @@ def _render_sidebar_eval() -> None:
                 st.sidebar.error(f"Eval failed: {out[:500]}")
 
 
-def _render_chunks(metadata: Dict[str, Any]) -> None:
-    """For each chunk show st.code (COBOL), caption (file + line), GitHub link, relevance."""
+def _infer_code_language(file_path: str) -> str:
+    """
+    Infer syntax highlighting language from file extension (PRD 9.2: COBOL or Fortran).
+
+    Args:
+        file_path: Relative or absolute path to source file.
+
+    Returns:
+        str: "fortran" for .f/.f90/.for, else "cobol".
+    """
+    if not file_path or not isinstance(file_path, str):
+        return "cobol"
+    ext = Path(file_path).suffix.lower()
+    if ext in FORTRAN_EXTENSIONS:
+        return "fortran"
+    return "cobol"
+
+
+def _fetch_file_content(base_url: str, path: str) -> Tuple[bool, str, Optional[str]]:
+    """
+    Fetch full file content from GET /file/content.
+
+    Args:
+        base_url: API base URL (e.g. http://localhost:8000).
+        path: Relative path to file (e.g. data/gnucobol-contrib/.../file.cbl).
+
+    Returns:
+        (success, content_or_error, error_msg)
+    """
+    if not path or not path.strip():
+        return False, "", "No file path"
+    url = f"{base_url.rstrip('/')}/file/content"
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.get(url, params={"path": path})
+        if resp.status_code != 200:
+            try:
+                err = resp.json().get("error", resp.text)
+            except Exception:
+                err = resp.text or f"HTTP {resp.status_code}"
+            return False, "", err
+        data = resp.json()
+        if not data.get("success"):
+            return False, "", data.get("error", "Unknown error")
+        return True, data.get("content", ""), None
+    except httpx.HTTPError as e:
+        return False, "", str(e)
+    except Exception as e:
+        logger.exception("Failed to fetch file content for %s", path)
+        return False, "", str(e)
+
+
+def _render_full_file_with_highlight(
+    content: str,
+    highlight_start: int,
+    highlight_end: int,
+) -> str:
+    """
+    Build HTML for full file view with line numbers and highlighted lines (PRD 9.3).
+
+    Args:
+        content: Full file content.
+        highlight_start: Start line of retrieved chunk (1-based).
+        highlight_end: End line of retrieved chunk (1-based).
+
+    Returns:
+        str: HTML string for st.components.v1.html().
+    """
+    lines = content.splitlines()
+    rows = []
+    for i, line in enumerate(lines, start=1):
+        escaped = html.escape(line).replace(" ", "&nbsp;")
+        cls = "highlight" if highlight_start <= i <= highlight_end else ""
+        rows.append(
+            f'<tr><td class="ln">{i}</td><td class="{cls}">{escaped}</td></tr>'
+        )
+    table_body = "\n".join(rows)
+    return f"""
+<style>
+  .file-view {{ font-family: monospace; font-size: 12px; max-height: 400px; overflow: auto; }}
+  .file-view table {{ border-collapse: collapse; width: 100%; }}
+  .file-view td {{ padding: 0 0.5em 0 0; vertical-align: top; }}
+  .file-view td.ln {{ color: #666; user-select: none; text-align: right; min-width: 3em; }}
+  .file-view td.highlight {{ background-color: #fff3cd; }}
+</style>
+<div class="file-view">
+<table><tbody>
+{table_body}
+</tbody></table>
+</div>
+"""
+
+
+def _render_chunks(metadata: Dict[str, Any], base_url: Optional[str] = None) -> None:
+    """
+    For each chunk: snippet, caption, GitHub link, relevance; expandable full file view (PRD 9.3).
+    Pre-Search 12: "Select as most relevant" button per chunk.
+    PRD 9.2: Syntax highlighting by file extension (COBOL or Fortran).
+    """
     chunks = metadata.get("chunks") or []
     file_paths = metadata.get("file_paths") or []
     line_numbers = metadata.get("line_numbers") or []
+    line_ranges = metadata.get("line_ranges") or []
     github_links = metadata.get("github_links") or []
     relevance_scores = metadata.get("relevance_scores") or []
-    n = max(len(chunks), len(file_paths), len(line_numbers), len(github_links), len(relevance_scores))
-    for i in range(n):
+    api_url = base_url or LEGACYLENS_API_URL
+    selected_idx = st.session_state.get(KEY_SELECTED_CHUNK_INDEX)
+    n = max(
+        len(chunks),
+        len(file_paths),
+        len(line_numbers),
+        len(github_links),
+        len(relevance_scores),
+    )
+    # Pre-Search 12: Show selected chunk first when user has chosen one
+    order = list(range(n))
+    if selected_idx is not None and 0 <= selected_idx < n:
+        order = [selected_idx] + [j for j in range(n) if j != selected_idx]
+    for idx in order:
+        i = idx
         chunk_text = chunks[i] if i < len(chunks) else ""
         fp = file_paths[i] if i < len(file_paths) else ""
         line_num = line_numbers[i] if i < len(line_numbers) else 0
+        lr = line_ranges[i] if i < len(line_ranges) else [line_num, line_num]
         link = github_links[i] if i < len(github_links) else ""
         score = relevance_scores[i] if i < len(relevance_scores) else 0.0
-        st.code(chunk_text, language="cobol")
+        highlight_start = lr[0] if len(lr) >= 1 else line_num
+        highlight_end = lr[1] if len(lr) >= 2 else line_num
+        lang = _infer_code_language(fp)
+
+        # Pre-Search 12: "Select as most relevant" — allow user to pick which chunk is most relevant
+        is_selected = selected_idx == i
+        btn_col, _ = st.columns([1, 4])
+        with btn_col:
+            if is_selected:
+                if st.button("✓ Selected — Clear", key=f"select_chunk_{i}"):
+                    st.session_state[KEY_SELECTED_CHUNK_INDEX] = None
+                    st.rerun()
+            else:
+                if st.button("Select as most relevant", key=f"select_chunk_{i}"):
+                    st.session_state[KEY_SELECTED_CHUNK_INDEX] = i
+                    st.rerun()
+
+        st.code(chunk_text, language=lang)
         st.caption(f"**File:** `{fp}` · **Line:** {line_num}")
         if link:
             st.markdown(f"[View on GitHub]({link})")
         st.metric("Relevance", f"{score:.2f}")
+
+        # PRD 9.3: Expand to view full file with retrieved lines highlighted
+        with st.expander("Show full file", expanded=False):
+            if fp:
+                ok, content, err = _fetch_file_content(api_url, fp)
+                if ok:
+                    html_frag = _render_full_file_with_highlight(
+                        content, highlight_start, highlight_end
+                    )
+                    components.html(html_frag, height=420, scrolling=True)
+                else:
+                    st.error(err or "Could not load file")
+            else:
+                st.caption("No file path available")
+
         st.divider()
+
+
+def _has_retrieved_chunks(metadata: Optional[Dict[str, Any]]) -> bool:
+    """
+    Return True when metadata contains at least one non-empty retrieved chunk.
+
+    Args:
+        metadata: Stream/API metadata dict that may include a "chunks" list.
+
+    Returns:
+        bool: True if at least one chunk has non-whitespace text.
+    """
+    if not metadata:
+        return False
+    chunks = metadata.get("chunks") or []
+    if not isinstance(chunks, list):
+        return False
+    return any(isinstance(chunk, str) and chunk.strip() for chunk in chunks)
 
 
 def main() -> None:
@@ -336,7 +503,7 @@ def main() -> None:
     st.sidebar.markdown("---")
     _render_sidebar_eval()
 
-    # Main: query input inside a form so Enter key submits (Streamlit form submit on Enter)
+    # Main: query input inside a form so Enter key submits (PRD 9.1: button + keyboard shortcut)
     with st.form("search_form", clear_on_submit=False):
         query = st.text_input(
             "Ask about the codebase",
@@ -345,6 +512,7 @@ def main() -> None:
             label_visibility="visible",
         )
         search_clicked = st.form_submit_button("Search")
+    st.caption("Press **Enter** to search")
     if search_clicked:
         st.session_state[KEY_RUN_SEARCH] = True
         st.rerun()
@@ -384,6 +552,7 @@ def main() -> None:
         st.session_state[KEY_SKIP_NEXT_LAST_RESULT] = True  # avoid duplicate on next rerun
         st.session_state[KEY_LAST_METADATA] = None
         st.session_state[KEY_LAST_ANSWER] = ""
+        st.session_state[KEY_SELECTED_CHUNK_INDEX] = None  # Reset selection on new search
         q = query or st.session_state.get(KEY_QUERY_INPUT, "")
         st.session_state[KEY_RUN_SEARCH] = False
         if not q.strip():
@@ -410,10 +579,15 @@ def main() -> None:
                 if metadata:
                     st.subheader("Answer")
                     answer_placeholder.markdown(answer_text)
-                    st.session_state[KEY_LAST_METADATA] = metadata
                     st.session_state[KEY_LAST_ANSWER] = answer_text
-                    with st.expander("Retrieved chunks", expanded=False):
-                        _render_chunks(metadata)
+                    if _has_retrieved_chunks(metadata):
+                        st.session_state[KEY_LAST_METADATA] = metadata
+                        with st.expander("Retrieved chunks", expanded=False):
+                            _render_chunks(metadata, base_url=LEGACYLENS_API_URL)
+                    else:
+                        # Explicitly clear previously shown snippets when current
+                        # response has no retrieved chunks (e.g., out-of-scope).
+                        st.session_state[KEY_LAST_METADATA] = None
                 else:
                     answer_placeholder.markdown(answer_text or "(No answer returned.)")
                     st.session_state[KEY_LAST_ANSWER] = answer_text
@@ -427,7 +601,7 @@ def main() -> None:
         st.subheader("Answer")
         st.markdown(st.session_state.get(KEY_LAST_ANSWER, ""))
         with st.expander("Retrieved chunks", expanded=False):
-            _render_chunks(st.session_state[KEY_LAST_METADATA])
+            _render_chunks(st.session_state[KEY_LAST_METADATA], base_url=LEGACYLENS_API_URL)
 
 
 if __name__ == "__main__":
