@@ -1,0 +1,33 @@
+........................................................................ [ 66%]
+....................................                                     [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.9/site-packages/starlette/formparsers.py:12
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_answer_generator.py::TestApiSanitization::test_api_route_sanitizes_injection_query
+tests/test_answer_generator.py::TestApiSanitization::test_sanitize_query_imported_in_api
+  /Users/shreelakshmigopinatharao/LegacyLens/legacylens/api/main.py:120: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_answer_generator.py::TestApiSanitization::test_api_route_sanitizes_injection_query
+tests/test_answer_generator.py::TestApiSanitization::test_sanitize_query_imported_in_api
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+tests/test_answer_generator.py::TestApiSanitization::test_api_route_sanitizes_injection_query
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+108 passed, 6 warnings in 8.14s
