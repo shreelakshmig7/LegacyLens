@@ -89,31 +89,30 @@ def _project_root() -> Path:
 
 def _find_latest_eval_file() -> Optional[Path]:
     """
-    Return path to the latest full 20-case eval result file.
+    Return path to the most recently written full 20-case eval result file.
 
-    Only considers files whose name matches eval_YYYYMMDDTHHMMSSZ.txt.
-    Prefers files containing "Total: 20" (full run) so production does not
-    show a 6-case (e.g. 4/6) run as the summary.
+    Uses file mtime (modification time) so the file just written by Run Evals
+    is always shown after a run, regardless of filename sort or server clock.
+    Only considers files matching eval_YYYYMMDDTHHMMSSZ.txt with "Total: 20".
     """
     results_dir = _project_root() / "tests" / "results"
     if not results_dir.exists():
         return None
     pattern = str(results_dir / "eval_*.txt")
-    files = [
-        f for f in glob.glob(pattern)
-        if Path(f).name[len("eval_"):len("eval_") + 1].isdigit()
-    ]
-    if not files:
+    candidates: List[Tuple[float, Path]] = []
+    for f in glob.glob(pattern):
+        p = Path(f)
+        if p.name[len("eval_"):len("eval_") + 1].isdigit():
+            try:
+                head = p.read_text(encoding="utf-8", errors="ignore")[:500]
+                if "Total: 20" in head:
+                    candidates.append((p.stat().st_mtime, p))
+            except Exception:
+                continue
+    if not candidates:
         return None
-    files.sort(reverse=True)
-    for f in files:
-        try:
-            head = Path(f).read_text(encoding="utf-8", errors="ignore")[:500]
-            if "Total: 20" in head:
-                return Path(f)
-        except Exception:
-            continue
-    return Path(files[0])
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
 
 
 def _parse_eval_file(path: Path) -> Dict[str, Any]:
