@@ -338,6 +338,30 @@ class TestApiFileContentEndpoint(unittest.TestCase):
             self.assertIn("content", data)
             self.assertIn("IDENTIFICATION DIVISION", data["content"])
 
+    @patch("legacylens.api.main._fetch_file_from_github")
+    def test_file_content_fallback_to_github_when_not_on_disk(
+        self, mock_github: MagicMock
+    ) -> None:
+        """GET /file/content returns content from GitHub when file not on disk and repo env set."""
+        mock_github.return_value = (True, "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. FOO.\n", None)
+        with patch.dict(
+            os.environ,
+            {"REPO_OWNER": "o", "REPO_NAME": "r", "REPO_COMMIT": "abc"},
+            clear=False,
+        ):
+            client = TestClient(_get_app())
+            response = client.get("/file/content?path=samples/nonexistent/foo.cob")
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        self.assertTrue(data.get("success"), data)
+        self.assertIn("IDENTIFICATION DIVISION", data["content"])
+        mock_github.assert_called_once()
+        args = mock_github.call_args[0]
+        self.assertEqual(args[0], "o")
+        self.assertEqual(args[1], "r")
+        self.assertEqual(args[2], "abc")
+        self.assertEqual(args[3], "samples/nonexistent/foo.cob")
+
 
 class TestApiRepoPathDefault(unittest.TestCase):
     """assemble_context is called with repo_root default data/gnucobol-contrib when REPO_PATH unset."""

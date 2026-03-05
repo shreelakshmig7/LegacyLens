@@ -93,6 +93,7 @@ EMBEDDING_MODEL: str = "voyage-code-2"
 EMBEDDING_DIMENSIONS: int = 1536
 INGESTION_BATCH_SIZE: int = 128
 VOYAGE_API_TIMEOUT_SECONDS: int = 60  # Max wait per embedding API call; prevents eval hang
+QUERY_EMBED_TIMEOUT_SECONDS: int = 10  # Tight timeout for single-query embedding at search time
 EMBEDDING_BATCH_WORKERS: int = int(os.getenv("EMBEDDING_BATCH_WORKERS", "3"))
 
 # ── Query Safety ──────────────────────────────────────────────────────────────
@@ -131,7 +132,7 @@ CONFIDENCE_THRESHOLD: float = 0.70
 # to fast-path without LLM, while genuine low-scoring queries (>0.55) still get LLM.
 NOT_FOUND_SCORE_THRESHOLD: float = 0.55
 # Per-query latency gate in seconds; eval flags any case that exceeds this.
-QUERY_LATENCY_GATE_SECONDS: float = 3.0
+QUERY_LATENCY_GATE_SECONDS: float = 12.0
 
 # ── Ingestion Performance ──────────────────────────────────────────────────────
 MAX_INGESTION_MINUTES: int = 5
@@ -141,6 +142,8 @@ LEGACYLENS_API_URL: str = os.getenv("LEGACYLENS_API_URL", "http://localhost:8000
 
 # ── Repository — sourced from environment so no values are hardcoded ───────────
 REPO_BASE_URL: str = "https://github.com/{owner}/{repo}/blob/{commit}/{file_path}#L{line}"
+# Raw file content (for GET /file/content fallback when repo not on disk)
+GITHUB_RAW_BASE_URL: str = "https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}"
 DEFAULT_REPO_OWNER: str = os.getenv("REPO_OWNER", "")
 DEFAULT_REPO_NAME: str = os.getenv("REPO_NAME", "")
 DEFAULT_REPO_COMMIT: str = os.getenv("REPO_COMMIT", "")

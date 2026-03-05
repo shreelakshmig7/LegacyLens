@@ -17,7 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 # Load .env from project root so VOYAGE_API_KEY, OPENAI_API_KEY, etc. are set when running via uvicorn
 try:
@@ -38,6 +38,7 @@ from legacylens.config.constants import (
     FEATURE_TYPE_EXPLAIN,
     FEATURE_TYPE_GENERAL,
     FILE_CONTENT_ALLOWED_EXTENSIONS,
+    GITHUB_RAW_BASE_URL,
     MAX_FILE_SIZE_BYTES,
     MAX_FILE_VIEW_LINES,
     TOP_K,
@@ -131,6 +132,39 @@ def _resolve_and_validate_file_path(relative_path: str) -> Dict[str, Any]:
     return {"success": True, "path": str(resolved), "error": None}
 
 
+def _fetch_file_from_github(
+    owner: str,
+    repo: str,
+    ref: str,
+    path: str,
+) -> Tuple[bool, str, Optional[str]]:
+    """
+    Fetch raw file content from GitHub. Used when file is not on disk (e.g. production).
+
+    Args:
+        owner: GitHub repo owner.
+        repo: GitHub repo name.
+        ref: Branch or commit SHA (e.g. master, abc123).
+        path: Repo-relative file path (e.g. samples/example/file.cob).
+
+    Returns:
+        (success, content_or_empty, error_message). On success content is the file text.
+    """
+    if not owner or not repo or not ref or not path:
+        return False, "", "Missing owner, repo, ref, or path"
+    url = GITHUB_RAW_BASE_URL.format(owner=owner, repo=repo, ref=ref, path=path)
+    try:
+        import httpx
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url)
+        if resp.status_code != 200:
+            return False, "", f"GitHub returned {resp.status_code}"
+        return True, resp.text, None
+    except Exception as e:
+        logger.warning("GitHub fetch failed for %s: %s", url, e)
+        return False, "", str(e)
+
+
 app = FastAPI(
     title="LegacyLens API",
     description="Query interface for legacy codebase RAG.",
@@ -153,30 +187,46 @@ def file_content(path: str = ""):
     """
     Return full file content for PRD 9.3 drill-down (full file view with highlighted lines).
 
-    Path must be relative to project root, use allowed extensions, and pass security checks.
+    Path must be relative to project root or repo, use allowed extensions, and pass security checks.
+    If the file is not on disk (e.g. production without repo), fetches from GitHub when
+    REPO_OWNER, REPO_NAME, and REPO_COMMIT or REPO_BRANCH are set.
 
     Args:
-        path: Query param — relative path (e.g. data/gnucobol-contrib/samples/.../file.cbl).
+        path: Query param — relative path (e.g. samples/.../file.cbl or data/gnucobol-contrib/...).
 
     Returns:
         200: {"success": True, "content": str, "path": str}
         400/500: {"success": False, "error": str}
     """
     result = _resolve_and_validate_file_path(path)
-    if not result["success"]:
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "error": result["error"]},
+    if result["success"]:
+        file_path = result["path"]
+        try:
+            content = Path(file_path).read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            logger.warning("Failed to read file %s: %s", file_path, e)
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "error": f"Cannot read file: {e}"},
+            )
+    else:
+        if result["error"] != "File not found":
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result["error"]},
+            )
+        owner = os.getenv("REPO_OWNER", "").strip()
+        repo_name = os.getenv("REPO_NAME", "").strip()
+        ref = (
+            os.getenv("REPO_COMMIT", "").strip()
+            or os.getenv("REPO_BRANCH", "master").strip()
         )
-    file_path = result["path"]
-    try:
-        content = Path(file_path).read_text(encoding="utf-8", errors="replace")
-    except OSError as e:
-        logger.warning("Failed to read file %s: %s", file_path, e)
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": f"Cannot read file: {e}"},
-        )
+        ok, content, err = _fetch_file_from_github(owner, repo_name, ref, path)
+        if not ok:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result["error"]},
+            )
     lines = content.splitlines()
     if len(lines) > MAX_FILE_VIEW_LINES:
         lines = lines[:MAX_FILE_VIEW_LINES]
