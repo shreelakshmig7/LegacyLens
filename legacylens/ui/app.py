@@ -522,6 +522,10 @@ def main() -> None:
         search_clicked = st.form_submit_button("Search")
     st.caption("Press **Enter** to search")
     if search_clicked:
+        st.session_state[KEY_LAST_METADATA] = None
+        st.session_state[KEY_LAST_ANSWER] = ""
+        st.session_state[KEY_STREAM_ERROR] = None
+        st.session_state[KEY_SELECTED_CHUNK_INDEX] = None
         st.session_state[KEY_RUN_SEARCH] = True
         st.rerun()
 
