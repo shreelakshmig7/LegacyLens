@@ -385,8 +385,16 @@ def _render_full_file_with_highlight(
   .file-view {{ font-family: monospace; font-size: 12px; max-height: 400px; overflow: auto; }}
   .file-view table {{ border-collapse: collapse; width: 100%; }}
   .file-view td {{ padding: 0 0.5em 0 0; vertical-align: top; }}
+  /* Light mode (default) */
+  .file-view {{ color: #000; background: #fff; }}
   .file-view td.ln {{ color: #666; user-select: none; text-align: right; min-width: 3em; }}
   .file-view td.highlight {{ background-color: #fff3cd; }}
+  /* Dark mode: white text, dark background */
+  @media (prefers-color-scheme: dark) {{
+    .file-view {{ color: #fff; background: #262730; }}
+    .file-view td.ln {{ color: #9ca3af; }}
+    .file-view td.highlight {{ background-color: #374151; }}
+  }}
 </style>
 <div class="file-view">
 <table><tbody>

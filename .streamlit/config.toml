@@ -1,0 +1,14 @@
+# LegacyLens Streamlit theme configuration
+# Ensures code in retrieved chunks is visible in both light and dark mode.
+
+[theme.light]
+# Light mode: black text on light background for code blocks
+textColor = "#31333F"
+codeTextColor = "#000000"
+codeBackgroundColor = "#F0F2F6"
+
+[theme.dark]
+# Dark mode: white text on dark background for code blocks
+textColor = "#FAFAFA"
+codeTextColor = "#FFFFFF"
+codeBackgroundColor = "#262730"
