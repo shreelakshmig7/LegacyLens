@@ -573,11 +573,13 @@ def main() -> None:
         else:
             base_url = LEGACYLENS_API_URL
 
-            # Reserve result area so previous answer is cleared immediately (Streamlit keeps old content until we write)
+            # Reserve result area so previous answer and chunks are cleared immediately (Streamlit keeps old content until we write)
             result_placeholder = st.empty()
+            chunks_placeholder = st.empty()
             with result_placeholder.container():
                 st.subheader("Answer")
                 st.caption("Searching and analyzing codebase...")
+            chunks_placeholder.empty()
 
             with st.spinner("Searching and analyzing codebase..."):
                 metadata, answer_text, error_msg = _stream_query_stream(
@@ -587,6 +589,7 @@ def main() -> None:
             if error_msg:
                 st.session_state[KEY_STREAM_ERROR] = f"Unexpected error: {error_msg}"
                 result_placeholder.empty()
+                chunks_placeholder.empty()
                 st.error(st.session_state[KEY_STREAM_ERROR])
             else:
                 st.session_state[KEY_LAST_ANSWER] = answer_text
@@ -601,9 +604,12 @@ def main() -> None:
                 with result_placeholder.container():
                     st.subheader("Answer")
                     st.markdown(answer_text or "(No answer returned.)")
-                    if metadata and _has_retrieved_chunks(metadata):
+                if metadata and _has_retrieved_chunks(metadata):
+                    with chunks_placeholder.container():
                         with st.expander("Retrieved chunks", expanded=False):
                             _render_chunks(metadata, base_url=LEGACYLENS_API_URL)
+                else:
+                    chunks_placeholder.empty()
 
     # Show last result when we didn't run a search this run; skip one run after a search to avoid duplicate
     skip_next = st.session_state.pop(KEY_SKIP_NEXT_LAST_RESULT, None)
