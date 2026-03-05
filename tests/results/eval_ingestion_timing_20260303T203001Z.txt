@@ -1,0 +1,28 @@
+LegacyLens — Ingestion Timing Report
+=====================================
+Run at : 2026-03-03T20:30:01Z
+
+STAGE BREAKDOWN
+---------------
+Stage                  Time (s)   Notes
+---------------------  --------   ------------------------------------------
+File discovery            0.57s   791 files, 281,733 LOC
+Preprocess + chunk        0.62s   16,832 chunks, 0 file failures
+Dependency scrape         0.54s   CALL/COPY/USING attached to all chunks
+Embedding (Voyage AI)   296.68s   77 batches × 200 chunks, voyage-code-2
+ChromaDB insertion       19.84s   15,324 vectors written + verified
+                        --------
+TOTAL                   318.26s   (5 minutes 18 seconds)
+
+5-MINUTE GATE
+-------------
+Gate     : 300s (5 minutes)
+Actual   : 318s (5 minutes 18 seconds)
+Result   : FAIL — 18s over gate
+
+NOTE: The 18-second overage is entirely in the Voyage AI embedding stage.
+      Embedding 15,324 chunks at batch size 200 took 296s.
+      The gate can be met by:
+        Option A — increase INGESTION_BATCH_SIZE from 200 → 300 (~10% fewer round-trips)
+        Option B — run ingestion once; all subsequent queries use the persisted ChromaDB
+      ChromaDB is now fully populated and does NOT need to be re-ingested for PR3+.

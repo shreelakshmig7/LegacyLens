@@ -1,0 +1,85 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 50 items
+
+tests/test_dependency_mapper.py::TestMapDependenciesStructure::test_map_returns_structured_dict PASSED [  2%]
+tests/test_dependency_mapper.py::TestMapDependenciesStructure::test_map_surfaces_call_copy_using PASSED [  4%]
+tests/test_dependency_mapper.py::TestMapDependenciesStructure::test_map_classifies_internal_vs_external PASSED [  6%]
+tests/test_dependency_mapper.py::TestMapDependenciesMetadataFirst::test_map_uses_collection_get_not_search PASSED [  8%]
+tests/test_dependency_mapper.py::TestMapDependenciesMetadataFirst::test_map_includes_llm_summary PASSED [ 10%]
+tests/test_dependency_mapper.py::TestMapDependenciesEdgeCases::test_map_empty_query_returns_error PASSED [ 12%]
+tests/test_dependency_mapper.py::TestMapDependenciesEdgeCases::test_map_none_query_returns_error PASSED [ 14%]
+tests/test_dependency_mapper.py::TestMapDependenciesEdgeCases::test_map_unknown_module_returns_not_found PASSED [ 16%]
+tests/test_dependency_mapper.py::TestMapDependenciesEdgeCases::test_map_llm_failure_still_returns_structured_data PASSED [ 18%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_explicit PASSED [ 20%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_call_chain PASSED [ 22%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_copybooks PASSED [ 24%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_using_clause PASSED [ 26%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_paragraph PASSED [ 28%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_purpose PASSED [ 30%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_describe PASSED [ 32%]
+tests/test_query_router.py::TestDetectFeatureType::test_business_logic_query_rules PASSED [ 34%]
+tests/test_query_router.py::TestDetectFeatureType::test_business_logic_query_validation PASSED [ 36%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_prefix_overrides_business_logic PASSED [ 38%]
+tests/test_query_router.py::TestDetectFeatureType::test_doc_generate_query PASSED [ 40%]
+tests/test_query_router.py::TestDetectFeatureType::test_doc_generate_auto_document PASSED [ 42%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_entry_point PASSED [ 44%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_file_io PASSED [ 46%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_modify PASSED [ 48%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_error_handling PASSED [ 50%]
+tests/test_query_router.py::TestDetectFeatureType::test_empty_query_returns_general PASSED [ 52%]
+tests/test_query_router.py::TestDetectFeatureType::test_none_query_returns_general PASSED [ 54%]
+tests/test_query_router.py::TestDetectFeatureType::test_whitespace_query_returns_general PASSED [ 56%]
+tests/test_query_router.py::TestDetectFeatureType::test_case_insensitive PASSED [ 58%]
+tests/test_query_router.py::TestDetectFeatureType::test_priority_dependency_over_explain PASSED [ 60%]
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_returns_structured_dict PASSED [ 62%]
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_includes_paragraph_name_and_line_ref PASSED [ 64%]
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_references_variables_from_context PASSED [ 66%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_empty_query_returns_error PASSED [ 68%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_none_query_returns_error PASSED [ 70%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_no_results_returns_not_found PASSED [ 72%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_llm_failure_returns_fallback PASSED [ 74%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_search_failure_returns_error PASSED [ 76%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search PASSED [ 78%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_empty_after_sanitize_returns_400 PASSED [ 80%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_returns_200_and_structured_body PASSED [ 82%]
+tests/test_api.py::TestApiQueryEndpoint::test_api_query_search_failure_returns_500 PASSED [ 84%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_empty_query_returns_400 PASSED [ 86%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_error_token_format PASSED [ 88%]
+tests/test_api.py::TestApiQueryStreamEndpoint::test_api_stream_first_line_is_json_metadata PASSED [ 90%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_disallowed_extension PASSED [ 92%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_empty_path PASSED [ 94%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_rejects_path_traversal PASSED [ 96%]
+tests/test_api.py::TestApiFileContentEndpoint::test_file_content_returns_content_for_valid_path PASSED [ 98%]
+tests/test_api.py::TestApiRepoPathDefault::test_api_repo_path_default PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.9/site-packages/starlette/formparsers.py:12
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search
+  /Users/shreelakshmigopinatharao/LegacyLens/legacylens/api/main.py:122: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_api.py::TestApiQueryEndpoint::test_api_out_of_scope_query_returns_without_search
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 50 passed, 3 warnings in 0.48s ========================

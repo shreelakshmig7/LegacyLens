@@ -1,0 +1,62 @@
+LegacyLens Eval — 20260305T003420Z
+Total: 20
+Retrieval Precision: 14/20 (70.0%) — target >70%
+Answer Faithfulness: 10/20 (50.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 12.58s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 18.33s > 3.0s
+  LATENCY WARN: ll-003 exceeded latency gate: 13.08s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 21.69s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 14.96s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 15.26s > 3.0s
+  LATENCY WARN: ll-007 exceeded latency gate: 16.10s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 16.26s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 16.73s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 23.93s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 10.78s > 3.0s
+  LATENCY WARN: ll-012 exceeded latency gate: 20.39s > 3.0s
+  LATENCY WARN: ll-013 exceeded latency gate: 13.60s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 19.63s > 3.0s
+  LATENCY WARN: ll-015 exceeded latency gate: 15.39s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 20.96s > 3.0s
+  LATENCY WARN: ll-017 exceeded latency gate: 20.10s > 3.0s
+  LATENCY WARN: ll-018 exceeded latency gate: 14.13s > 3.0s
+  LATENCY WARN: ll-019 exceeded latency gate: 16.51s > 3.0s
+  LATENCY WARN: ll-020 exceeded latency gate: 18.10s > 3.0s
+
+[ret FAIL / ans PASS] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-002
+[ret PASS / ans FAIL] ll-003
+  answer forbidden: ['file path', 'line number']
+[ret FAIL / ans PASS] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret PASS / ans PASS] ll-006
+[ret PASS / ans FAIL] ll-007
+  answer missing: ['PROCEDURE DIVISION', 'section']
+[ret PASS / ans PASS] ll-008
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans PASS] ll-010
+[ret FAIL / ans FAIL] ll-011
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCSORT/tests/src/gctestrun2.cbl', 'paragraph_name': 'ST04-00'}]
+  answer missing: ['CALL', 'program']
+[ret FAIL / ans PASS] ll-012
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/TUI-TOOLS/GC99SCREENPAINTER.COB', 'paragraph_name': ''}]
+[ret FAIL / ans FAIL] ll-013
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cobweb/cobweb-gtk/cobweb-gtk.cob', 'paragraph_name': ''}]
+  answer missing: ['USING', 'parameter']
+[ret PASS / ans PASS] ll-014
+[ret PASS / ans FAIL] ll-015
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans PASS] ll-016
+[ret FAIL / ans FAIL] ll-017
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example7/PGMOD7.cbl', 'paragraph_name': ''}]
+  answer missing: ['copybook', 'variable', 'COPY']
+[ret PASS / ans FAIL] ll-018
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans FAIL] ll-019
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans PASS] ll-020

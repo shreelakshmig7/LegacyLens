@@ -1,0 +1,56 @@
+LegacyLens Eval (API mode: https://legacylens-api-production-d534.up.railway.app) — 20260304T065437Z
+Total: 20
+Retrieval Precision: 10/20 (50.0%) — target >70%
+Answer Faithfulness: 15/20 (75.0%) — target >70%
+Latency Gate (3.0s): FAIL
+NOTE: API mode scores file_path match only (paragraph_name not in HTTP response)
+
+  LATENCY WARN: ll-001 exceeded latency gate: 3.21s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 5.33s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 14.27s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 5.48s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 8.48s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 3.06s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 8.48s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 13.61s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 5.71s > 3.0s
+  LATENCY WARN: ll-012 exceeded latency gate: 4.20s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 19.14s > 3.0s
+  LATENCY WARN: ll-015 exceeded latency gate: 3.05s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 4.88s > 3.0s
+  LATENCY WARN: ll-020 exceeded latency gate: 3.64s > 3.0s
+[ret FAIL / ans PASS] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+[ret FAIL / ans PASS] ll-002
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'UPDATE-RECORD'}, {'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'ADD-RECORD'}]
+[ret PASS / ans PASS] ll-003
+[ret PASS / ans FAIL] ll-004
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret FAIL / ans PASS] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]
+[ret FAIL / ans PASS] ll-007
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/gcic.cbl', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-008
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans PASS] ll-010
+[ret FAIL / ans PASS] ll-011
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCSORT/tests/src/gctestrun2.cbl', 'paragraph_name': 'ST04-00'}]
+[ret FAIL / ans PASS] ll-012
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/TUI-TOOLS/GC99SCREENPAINTER.COB', 'paragraph_name': ''}]
+[ret FAIL / ans FAIL] ll-013
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cobweb/cobweb-gtk/cobweb-gtk.cob', 'paragraph_name': ''}]
+  answer missing: ['USING', 'parameter']
+[ret FAIL / ans PASS] ll-014
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/v2.01-4/gcic.cbl', 'paragraph_name': 'L-PROCEDURE-NAME'}]
+[ret PASS / ans PASS] ll-015
+[ret FAIL / ans PASS] ll-016
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cntlines/cntlines.cbl', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-017
+[ret PASS / ans FAIL] ll-018
+  answer forbidden: ['xyzzy']
+[ret PASS / ans PASS] ll-019
+[ret FAIL / ans PASS] ll-020
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': ''}]

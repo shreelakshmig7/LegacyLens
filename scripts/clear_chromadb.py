@@ -39,6 +39,17 @@ def main() -> None:
     else:
         print(f"Collection '{_COLLECTION_NAME}' does not exist (already empty or never ingested).")
 
+    # Verify: list remaining collections (should not contain legacylens_cobol)
+    remaining = [c.name for c in client.list_collections()]
+    if remaining:
+        print(f"Remaining collections: {remaining}")
+    else:
+        print("ChromaDB is empty (no collections).")
+    if _COLLECTION_NAME in remaining:
+        print("WARNING: Collection still present after delete.")
+    else:
+        print("Verified: collection is cleared.")
+
 
 if __name__ == "__main__":
     main()

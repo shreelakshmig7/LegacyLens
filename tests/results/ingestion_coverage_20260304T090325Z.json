@@ -1,0 +1,11 @@
+{
+  "run_at": "2026-03-04T09:03:25.435516+00:00",
+  "repo_path": "/Users/shreelakshmigopinatharao/LegacyLens/data/gnucobol-contrib",
+  "files_discovered": 791,
+  "files_failed": 0,
+  "total_loc": 281733,
+  "chunks_produced": 17791,
+  "chunks_embedded": 16227,
+  "chunks_skipped_oversized": 1564,
+  "verified": true
+}

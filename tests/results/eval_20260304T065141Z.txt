@@ -1,0 +1,68 @@
+LegacyLens Eval (API mode: https://legacylens-api-production-d534.up.railway.app) — 20260304T065141Z
+Total: 20
+Retrieval Precision: 7/20 (35.0%) — target >70%
+Answer Faithfulness: 11/20 (55.0%) — target >70%
+Latency Gate (3.0s): FAIL
+NOTE: API mode scores file_path match only (paragraph_name not in HTTP response)
+
+  LATENCY WARN: ll-002 exceeded latency gate: 5.41s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 12.41s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 6.01s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 7.44s > 3.0s
+  LATENCY WARN: ll-007 exceeded latency gate: 3.00s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 3.45s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 5.36s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 24.37s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 6.79s > 3.0s
+  LATENCY WARN: ll-012 exceeded latency gate: 6.75s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 29.98s > 3.0s
+  LATENCY WARN: ll-015 exceeded latency gate: 4.35s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 4.30s > 3.0s
+[ret FAIL / ans PASS] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+[ret FAIL / ans PASS] ll-002
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'UPDATE-RECORD'}, {'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'ADD-RECORD'}]
+[ret PASS / ans PASS] ll-003
+[ret PASS / ans FAIL] ll-004
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret FAIL / ans FAIL] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]
+  answer missing: ['paragraph']
+[ret FAIL / ans PASS] ll-007
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/gcic.cbl', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-008
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans PASS] ll-010
+[ret FAIL / ans PASS] ll-011
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCSORT/tests/src/gctestrun2.cbl', 'paragraph_name': 'ST04-00'}]
+[ret FAIL / ans PASS] ll-012
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/TUI-TOOLS/GC99SCREENPAINTER.COB', 'paragraph_name': ''}]
+[ret FAIL / ans FAIL] ll-013
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cobweb/cobweb-gtk/cobweb-gtk.cob', 'paragraph_name': ''}]
+  answer missing: ['USING', 'parameter']
+[ret FAIL / ans PASS] ll-014
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/v2.01-4/gcic.cbl', 'paragraph_name': 'L-PROCEDURE-NAME'}]
+[ret PASS / ans PASS] ll-015
+[ret FAIL / ans PASS] ll-016
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cntlines/cntlines.cbl', 'paragraph_name': ''}]
+[ret ERROR / ans FAIL] ll-017
+  retrieval ERROR: API call failed: Server error '502 Bad Gateway' for url 'https://legacylens-api-production-d534.up.railway.app/query'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example7/PGMOD7.cbl', 'paragraph_name': ''}]
+  answer missing: ['copybook', 'variable', 'COPY']
+[ret ERROR / ans FAIL] ll-018
+  retrieval ERROR: API call failed: Server error '502 Bad Gateway' for url 'https://legacylens-api-production-d534.up.railway.app/query'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+  answer missing: ['not found']
+[ret ERROR / ans FAIL] ll-019
+  retrieval ERROR: API call failed: Server error '502 Bad Gateway' for url 'https://legacylens-api-production-d534.up.railway.app/query'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+  answer missing: ['interest', 'rule', 'paragraph', 'line number']
+[ret ERROR / ans FAIL] ll-020
+  retrieval ERROR: API call failed: Server error '502 Bad Gateway' for url 'https://legacylens-api-production-d534.up.railway.app/query'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/502
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': ''}]
+  answer missing: ['validation', 'customer', 'line number']

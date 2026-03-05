@@ -1,0 +1,28 @@
+LegacyLens — Ingestion Coverage Report
+=======================================
+Run at : 2026-03-03T20:30:01Z
+Repo   : data/gnucobol-contrib
+
+FILES
+-----
+Discovered   : 791
+Failed        : 0  (tolerance = 0 → PASS)
+Match delta  : 0   ✓
+
+LOC
+---
+Total lines  : 281,733
+
+CHUNKS
+------
+Produced     : 16,832
+Oversized (skipped) : 1,508  (~9.0% — chunks exceeding 500-token limit, correctly filtered)
+Sent to Voyage      : 15,324
+Embedded            : 15,324
+Stored in ChromaDB  : 15,324
+Verification (zero-tolerance) : PASS  ✓  (ChromaDB count == embedded count)
+
+ZERO-TOLERANCE CHECK
+--------------------
+Files discovered vs files indexed : 791 / 791 → PASS  ✓
+Chunks embedded vs chunks stored  : 15,324 / 15,324 → PASS  ✓

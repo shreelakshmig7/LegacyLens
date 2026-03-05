@@ -32,6 +32,9 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from legacylens.config.constants import (
+    FEATURE_TYPE_BUSINESS_LOGIC,
+    FEATURE_TYPE_DEPENDENCY,
+    FEATURE_TYPE_DOC_GENERATE,
     FEATURE_TYPE_EXPLAIN,
     FEATURE_TYPE_GENERAL,
     FILE_CONTENT_ALLOWED_EXTENSIONS,
@@ -41,7 +44,10 @@ from legacylens.config.constants import (
     validate_required_env_vars,
 )
 from legacylens.features import detect_feature_type
+from legacylens.features.business_logic_extractor import extract_business_logic as _extract_biz
 from legacylens.features.code_explainer import explain as _explain_code
+from legacylens.features.dependency_mapper import map_dependencies as _map_deps
+from legacylens.features.doc_generator import generate_documentation as _gen_docs
 from legacylens.generation.answer_generator import (
     _OUT_OF_SCOPE_TEMPLATE,
     _build_github_link,
@@ -97,7 +103,17 @@ def _resolve_and_validate_file_path(relative_path: str) -> Dict[str, Any]:
     except ValueError:
         return {"success": False, "path": None, "error": "Path resolves outside project root"}
     if not resolved.exists():
-        return {"success": False, "path": None, "error": "File not found"}
+        repo_path = os.getenv("REPO_PATH", "").strip()
+        if repo_path:
+            alt = (Path(repo_path) / path_str).resolve()
+            try:
+                alt.relative_to(_PROJECT_ROOT.resolve())
+            except ValueError:
+                return {"success": False, "path": None, "error": "Path resolves outside project root"}
+            if alt.exists() and alt.is_file():
+                resolved = alt
+        if not resolved.exists():
+            return {"success": False, "path": None, "error": "File not found"}
     if not resolved.is_file():
         return {"success": False, "path": None, "error": "Path is not a file"}
     try:
@@ -248,6 +264,48 @@ def _generate_with_feature_routing(
         return {
             "success": result.get("success", False),
             "answer": result.get("explanation", ""),
+        }
+
+    if feature_type == FEATURE_TYPE_DEPENDENCY:
+        logger.info("Feature routing: dependency for query: %.60s", sanitized)
+        result = _map_deps(sanitized)
+        answer_parts = [result.get("summary", "")]
+        deps = result.get("dependencies")
+        if deps:
+            if deps.get("calls"):
+                answer_parts.append(
+                    "\n\nCALL targets: "
+                    + ", ".join(f"{c['target']} ({c['dep_type']})" for c in deps["calls"])
+                )
+            if deps.get("copies"):
+                answer_parts.append(
+                    "\nCOPY targets: "
+                    + ", ".join(f"{c['target']} ({c['dep_type']})" for c in deps["copies"])
+                )
+            if deps.get("usings"):
+                answer_parts.append(
+                    "\nUSING targets: "
+                    + ", ".join(f"{c['target']} ({c['dep_type']})" for c in deps["usings"])
+                )
+        return {
+            "success": result.get("success", False),
+            "answer": "".join(answer_parts),
+        }
+
+    if feature_type == FEATURE_TYPE_BUSINESS_LOGIC:
+        logger.info("Feature routing: business_logic for query: %.60s", sanitized)
+        result = _extract_biz(sanitized)
+        return {
+            "success": result.get("success", False),
+            "answer": result.get("business_rules", ""),
+        }
+
+    if feature_type == FEATURE_TYPE_DOC_GENERATE:
+        logger.info("Feature routing: doc_generate for query: %.60s", sanitized)
+        result = _gen_docs(sanitized)
+        return {
+            "success": result.get("success", False),
+            "answer": result.get("documentation", ""),
         }
 
     logger.info("Feature routing: type=%s for query: %.60s", feature_type, sanitized)

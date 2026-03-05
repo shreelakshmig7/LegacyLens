@@ -1,0 +1,25 @@
+/Users/shreelakshmigopinatharao/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+plugins: anyio-4.12.1, langsmith-0.4.37
+collecting ... collected 14 items
+
+tests/test_query_processor.py::test_process_query_returns_success_dict PASSED [  7%]
+tests/test_query_processor.py::test_process_query_data_has_required_keys PASSED [ 14%]
+tests/test_query_processor.py::test_normalize_lowercase PASSED           [ 21%]
+tests/test_query_processor.py::test_normalize_strip_whitespace PASSED    [ 28%]
+tests/test_query_processor.py::test_normalize_collapse_internal_whitespace PASSED [ 35%]
+tests/test_query_processor.py::test_entities_extract_cobol_paragraph_name PASSED [ 42%]
+tests/test_query_processor.py::test_entities_extract_multiple_identifiers PASSED [ 50%]
+tests/test_query_processor.py::test_entities_empty_when_none_present PASSED [ 57%]
+tests/test_query_processor.py::test_expansion_entry_point_adds_main_procedure PASSED [ 64%]
+tests/test_query_processor.py::test_expansion_dependencies_adds_call_copy_using PASSED [ 71%]
+tests/test_query_processor.py::test_intent_find_location_for_where_query PASSED [ 78%]
+tests/test_query_processor.py::test_intent_explain_for_explain_query PASSED [ 85%]
+tests/test_query_processor.py::test_empty_query_returns_failure_or_safe_normalized PASSED [ 92%]
+tests/test_query_processor.py::test_process_query_does_not_mutate_input PASSED [100%]
+
+============================== 14 passed in 0.02s ==============================

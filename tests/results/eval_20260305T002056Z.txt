@@ -1,0 +1,56 @@
+LegacyLens Eval — 20260305T002056Z
+Total: 20
+Retrieval Precision: 14/20 (70.0%) — target >70%
+Answer Faithfulness: 14/20 (70.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 6.34s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 6.41s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 6.18s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 4.15s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 4.67s > 3.0s
+  LATENCY WARN: ll-007 exceeded latency gate: 5.37s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 9.16s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 5.73s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 15.94s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 3.48s > 3.0s
+  LATENCY WARN: ll-012 exceeded latency gate: 3.16s > 3.0s
+  LATENCY WARN: ll-013 exceeded latency gate: 7.11s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 5.78s > 3.0s
+  LATENCY WARN: ll-015 exceeded latency gate: 3.57s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 3.36s > 3.0s
+  LATENCY WARN: ll-018 exceeded latency gate: 3.03s > 3.0s
+  LATENCY WARN: ll-020 exceeded latency gate: 6.15s > 3.0s
+
+[ret FAIL / ans PASS] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-002
+[ret PASS / ans FAIL] ll-003
+  answer missing: ['not found']
+  answer forbidden: ['file path', 'line number']
+[ret FAIL / ans PASS] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret PASS / ans PASS] ll-006
+[ret PASS / ans PASS] ll-007
+[ret PASS / ans PASS] ll-008
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans PASS] ll-010
+[ret FAIL / ans PASS] ll-011
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCSORT/tests/src/gctestrun2.cbl', 'paragraph_name': 'ST04-00'}]
+[ret FAIL / ans PASS] ll-012
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/TUI-TOOLS/GC99SCREENPAINTER.COB', 'paragraph_name': ''}]
+[ret FAIL / ans PASS] ll-013
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cobweb/cobweb-gtk/cobweb-gtk.cob', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-014
+[ret PASS / ans FAIL] ll-015
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans PASS] ll-016
+[ret FAIL / ans PASS] ll-017
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example7/PGMOD7.cbl', 'paragraph_name': ''}]
+[ret PASS / ans FAIL] ll-018
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans FAIL] ll-019
+  answer forbidden: ['file path', 'line number']
+[ret PASS / ans PASS] ll-020

@@ -1,0 +1,27 @@
+=== LegacyLens Ingestion Timing Report ===
+Run at:         2026-03-03T20:51:53Z
+Batch size:     300 (INGESTION_BATCH_SIZE)
+
+Stage                   Time (s)    Share
+-----------------------------------------
+Discovery               0.26        < 0.1%
+Preprocess + Chunk      0.57        0.2%
+Dependency Scrape       0.50        0.2%
+Embedding               302.09      95.7%
+Vector Store Insert     12.13       3.8%
+-----------------------------------------
+TOTAL                   315.55 s    (5m 15.6s)
+
+Gate (300s / 5m):       FAIL  (+15.6s over limit)
+
+Chunks:
+  Total produced:       16,832
+  Skipped (oversized):  1,508
+  Embedded & stored:    15,324
+
+Notes:
+  Bottleneck is Voyage AI API latency — 95.7% of runtime.
+  Batch size 300 yielded ~52 API calls vs ~77 at batch=200.
+  Per-call latency at batch=300 is ~5.8s vs ~2.2s at batch=200,
+  so throughput gain is cancelled by slower per-call processing.
+  Total wall time improved by only 2.5s vs the previous run.

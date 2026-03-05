@@ -304,3 +304,117 @@ class TestProgramCategoriesConstant:
         """PGMOD1 must be in the default PROGRAM_CATEGORIES list."""
         from legacylens.config.constants import PROGRAM_CATEGORIES
         assert "PGMOD1" in PROGRAM_CATEGORIES
+
+
+# ---------------------------------------------------------------------------
+# Searcher fallback trigger — max vector score gate
+# ---------------------------------------------------------------------------
+
+class TestSearcherBm25FallbackTrigger:
+    """BM25 fallback must trigger on low vector max-score, not only result count."""
+
+    def test_low_max_vector_score_triggers_bm25(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When max(vector score) < 0.70, search must replace vector results with BM25."""
+        from legacylens.retrieval import searcher
+
+        monkeypatch.setattr(
+            searcher,
+            "process_query",
+            lambda q: {
+                "success": True,
+                "data": {"normalized_query": q, "target_type": ""},
+                "error": None,
+            },
+        )
+        monkeypatch.setattr(
+            searcher,
+            "detect_program",
+            lambda q: {"success": True, "data": {"program": None}, "error": None},
+        )
+        monkeypatch.setattr(
+            searcher,
+            "embed_chunks",
+            lambda chunks: {
+                "success": True,
+                "data": {"chunks": [{"text": chunks[0]["text"], "embedding": [0.1, 0.2]}]},
+                "error": None,
+            },
+        )
+        monkeypatch.setattr(
+            searcher,
+            "query_similar",
+            lambda vector, top_k, filters=None: {
+                "success": True,
+                "data": {
+                    "results": [
+                        {"text": "vector-1", "metadata": {"file_name": "A"}, "score": 0.65},
+                        {"text": "vector-2", "metadata": {"file_name": "A"}, "score": 0.62},
+                        {"text": "vector-3", "metadata": {"file_name": "A"}, "score": 0.61},
+                    ],
+                },
+                "error": None,
+            },
+        )
+        monkeypatch.setattr(
+            searcher,
+            "_bm25_search",
+            lambda query, top_k: [
+                {"text": "bm25-hit", "metadata": {"file_name": "A"}, "score": 4.2},
+            ],
+        )
+
+        result = searcher.search("which paragraphs pass parameters using clauses?", top_k=3)
+        assert result["success"] is True
+        assert result["data"]["results"][0]["text"] == "bm25-hit"
+
+    def test_high_max_vector_score_keeps_vector_results(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When max(vector score) >= 0.70 and enough results exist, BM25 must not run."""
+        from legacylens.retrieval import searcher
+
+        monkeypatch.setattr(
+            searcher,
+            "process_query",
+            lambda q: {
+                "success": True,
+                "data": {"normalized_query": q, "target_type": ""},
+                "error": None,
+            },
+        )
+        monkeypatch.setattr(
+            searcher,
+            "detect_program",
+            lambda q: {"success": True, "data": {"program": None}, "error": None},
+        )
+        monkeypatch.setattr(
+            searcher,
+            "embed_chunks",
+            lambda chunks: {
+                "success": True,
+                "data": {"chunks": [{"text": chunks[0]["text"], "embedding": [0.3, 0.4]}]},
+                "error": None,
+            },
+        )
+        monkeypatch.setattr(
+            searcher,
+            "query_similar",
+            lambda vector, top_k, filters=None: {
+                "success": True,
+                "data": {
+                    "results": [
+                        {"text": "vector-strong", "metadata": {"file_name": "A"}, "score": 0.81},
+                        {"text": "vector-mid", "metadata": {"file_name": "A"}, "score": 0.75},
+                        {"text": "vector-low", "metadata": {"file_name": "A"}, "score": 0.72},
+                    ],
+                },
+                "error": None,
+            },
+        )
+
+        def _fail_if_called(query: str, top_k: int) -> list:
+            raise AssertionError("BM25 fallback should not be called for high-score vector hits")
+
+        monkeypatch.setattr(searcher, "_bm25_search", _fail_if_called)
+
+        result = searcher.search("main entry point", top_k=3)
+        assert result["success"] is True
+        assert result["data"]["results"][0]["text"] == "vector-strong"

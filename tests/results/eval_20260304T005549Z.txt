@@ -1,0 +1,29 @@
+LegacyLens Eval — 20260304T005549Z
+Total: 6
+Retrieval Precision: 0/6 (0.0%) — target >70%
+Answer Faithfulness: 0/6 (0.0%) — target >70%
+Latency Gate (3.0s): PASS
+
+[ret ERROR / ans FAIL] ll-001
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+  answer missing: ['file path', 'line number', 'paragraph']
+[ret ERROR / ans FAIL] ll-002
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'UPDATE-RECORD'}, {'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'ADD-RECORD'}]
+  answer missing: ['CUSTOMER-RECORD', 'paragraph', 'line number']
+[ret ERROR / ans FAIL] ll-003
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  answer missing: ['not found']
+[ret ERROR / ans FAIL] ll-004
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+  answer missing: ['OPEN', 'READ', 'WRITE', 'file']
+[ret ERROR / ans FAIL] ll-005
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': ''}]
+  answer missing: ['CALL', 'dependency', 'module']
+[ret ERROR / ans FAIL] ll-006
+  retrieval ERROR: Embedding failed after 3 retries: Error communicating with VoyageAI: HTTPSConnectionPool(host='api.voyageai.com', port=443): Max retries exceeded with url: /v1/embeddings (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]
+  answer missing: ['error', 'paragraph', 'line number']

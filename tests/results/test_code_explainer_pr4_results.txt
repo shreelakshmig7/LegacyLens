@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 8 items
+
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_returns_structured_dict PASSED [ 12%]
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_includes_paragraph_name_and_line_ref PASSED [ 25%]
+tests/test_code_explainer.py::TestExplainReturnsStructuredDict::test_explain_references_variables_from_context PASSED [ 37%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_empty_query_returns_error PASSED [ 50%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_none_query_returns_error PASSED [ 62%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_no_results_returns_not_found PASSED [ 75%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_llm_failure_returns_fallback PASSED [ 87%]
+tests/test_code_explainer.py::TestExplainEdgeCases::test_explain_search_failure_returns_error PASSED [100%]
+
+============================== 8 passed in 0.25s ===============================

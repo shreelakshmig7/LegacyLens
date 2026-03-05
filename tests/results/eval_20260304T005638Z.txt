@@ -1,0 +1,20 @@
+LegacyLens Eval — 20260304T005638Z
+Total: 6
+Retrieval Precision: 6/6 (100.0%) — target >70%
+Answer Faithfulness: 3/6 (50.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 6.84s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 7.39s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 8.57s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 5.35s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 6.71s > 3.0s
+
+[ret PASS / ans PASS] ll-001
+[ret PASS / ans PASS] ll-002
+[ret PASS / ans PASS] ll-003
+[ret PASS / ans FAIL] ll-004
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret PASS / ans FAIL] ll-006
+  answer missing: ['paragraph']

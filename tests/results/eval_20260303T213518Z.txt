@@ -1,0 +1,62 @@
+LegacyLens Eval — 20260303T213518Z
+Total: 20
+Retrieval Precision: 2/20 (10.0%) — target >70%
+Answer Faithfulness (stub): 3/20
+
+[ret FAIL / ans FAIL] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': 'MAIN-PGMOD1'}]
+  answer missing: ['file path', 'line number', 'paragraph']
+[ret FAIL / ans FAIL] ll-002
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'UPDATE-RECORD'}, {'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'ADD-RECORD'}]
+  answer missing: ['paragraph', 'line number']
+[ret PASS / ans FAIL] ll-003
+  answer missing: ['not found']
+  answer forbidden: ['CALCULATE-INTEREST']
+[ret FAIL / ans FAIL] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'INQUIRE-PARA'}, {'file_path': 'data/gnucobol-contrib/tools/changeformat/changeformat-f.cbl', 'paragraph_name': 'CHECK-INPUT-FILE'}]
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret FAIL / ans FAIL] ll-005
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': 'COPY-SQL-MSG-IN-LINKAGE'}]
+  answer missing: ['CALL', 'dependency']
+[ret FAIL / ans FAIL] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/worldcities/worldcities5.cbl', 'paragraph_name': 'SQL-ERROR'}, {'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': 'UPDATE-RECORD'}]
+  answer missing: ['paragraph', 'line number']
+[ret FAIL / ans PASS] ll-007
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD — PROCEDURE DIVISION header'}]
+[ret FAIL / ans FAIL] ll-008
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD — WORKING-STORAGE SECTION'}]
+  answer missing: ['line number']
+[ret FAIL / ans FAIL] ll-009
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD — FILE SECTION'}]
+  answer missing: ['FD']
+[ret FAIL / ans FAIL] ll-010
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['line number', 'file path']
+[ret FAIL / ans FAIL] ll-011
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['line number']
+[ret FAIL / ans FAIL] ll-012
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['line number']
+[ret FAIL / ans FAIL] ll-013
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['line number']
+[ret FAIL / ans PASS] ll-014
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+[ret FAIL / ans FAIL] ll-015
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['paragraph', 'line number']
+[ret FAIL / ans FAIL] ll-016
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+  answer missing: ['line number']
+[ret FAIL / ans PASS] ll-017
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD'}]
+[ret PASS / ans FAIL] ll-018
+  answer missing: ['not found']
+  answer forbidden: ['xyzzy']
+[ret FAIL / ans FAIL] ll-019
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD — e.g. CALCULATE-INTEREST'}]
+  answer missing: ['paragraph', 'line number']
+[ret FAIL / ans FAIL] ll-020
+  retrieval missing: [{'file_path': 'TBD — update in PR 2 after repo clone', 'paragraph_name': 'TBD — e.g. VALIDATE-INPUT or EDIT-CUSTOMER-DATA'}]
+  answer missing: ['line number']

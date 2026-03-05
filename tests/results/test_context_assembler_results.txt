@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 5 items
+
+tests/test_context_assembler.py::test_assemble_returns_list PASSED       [ 20%]
+tests/test_context_assembler.py::test_assemble_each_item_has_assembled_context PASSED [ 40%]
+tests/test_context_assembler.py::test_assemble_preserves_original_keys PASSED [ 60%]
+tests/test_context_assembler.py::test_assemble_parent_section_in_context PASSED [ 80%]
+tests/test_context_assembler.py::test_assemble_empty_input_returns_empty PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_context_assembler.py::test_assemble_parent_section_in_context
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 5 passed, 1 warning in 0.93s =========================

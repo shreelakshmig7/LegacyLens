@@ -1,0 +1,28 @@
+LegacyLens Eval — 20260304T160241Z
+Total: 6
+Retrieval Precision: 2/6 (33.3%) — target >70%
+Answer Faithfulness: 0/6 (0.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 14.66s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 14.05s > 3.0s
+  LATENCY WARN: ll-003 exceeded latency gate: 14.44s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 14.25s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 14.53s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 14.15s > 3.0s
+
+[ret FAIL / ans FAIL] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+  answer missing: ['file path', 'line number', 'paragraph']
+[ret PASS / ans FAIL] ll-002
+  answer missing: ['CUSTOMER-RECORD', 'paragraph', 'line number']
+[ret PASS / ans FAIL] ll-003
+  answer missing: ['not found']
+[ret FAIL / ans FAIL] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+  answer missing: ['OPEN', 'READ', 'WRITE', 'file']
+[ret FAIL / ans FAIL] ll-005
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': ''}]
+  answer missing: ['CALL', 'dependency', 'module']
+[ret FAIL / ans FAIL] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]
+  answer missing: ['error', 'paragraph', 'line number']

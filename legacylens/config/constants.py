@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 # ── Retrieval ──────────────────────────────────────────────────────────────────
 TOP_K: int = 5
+TOP_K_COMPOUND: int = 10  # Expanded window when multiple COBOL entities detected
 MIN_RELEVANCE_THRESHOLD: float = 0.70
 BM25_FALLBACK_THRESHOLD: int = 3  # Trigger BM25 fallback when similarity results < this
 

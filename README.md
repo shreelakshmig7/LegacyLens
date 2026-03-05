@@ -20,7 +20,7 @@ Natural language query
          │
          ▼
 ┌─────────────────┐
-│   ChromaDB       │  top-k semantic search + BM25 fallback
+│   ChromaDB       │  top-k semantic search + BM25 fallback on low max relevance
 │  Vector Store    │
 └────────┬────────┘
          │
@@ -119,6 +119,11 @@ python -m pytest tests/ -v
 ```
 
 Test results are saved to `tests/results/`.
+
+Retrieval fallback behavior:
+- Vector search runs first.
+- If vector max score is below `MIN_RELEVANCE_THRESHOLD` (0.70), BM25 fallback runs.
+- If BM25 also returns nothing useful, the API returns a structured `not found` response with query reformulation suggestions.
 
 ---
 

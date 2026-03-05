@@ -1,0 +1,79 @@
+LegacyLens Eval — 20260304T194552Z
+Total: 20
+Retrieval Precision: 7/20 (35.0%) — target >70%
+Answer Faithfulness: 0/20 (0.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 15.14s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 14.32s > 3.0s
+  LATENCY WARN: ll-003 exceeded latency gate: 14.84s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 14.54s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 14.58s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 14.30s > 3.0s
+  LATENCY WARN: ll-007 exceeded latency gate: 14.26s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 14.16s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 14.13s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 14.18s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 14.22s > 3.0s
+  LATENCY WARN: ll-012 exceeded latency gate: 14.22s > 3.0s
+  LATENCY WARN: ll-013 exceeded latency gate: 14.19s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 14.26s > 3.0s
+  LATENCY WARN: ll-015 exceeded latency gate: 14.26s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 14.07s > 3.0s
+  LATENCY WARN: ll-017 exceeded latency gate: 14.03s > 3.0s
+  LATENCY WARN: ll-018 exceeded latency gate: 14.54s > 3.0s
+  LATENCY WARN: ll-019 exceeded latency gate: 14.13s > 3.0s
+  LATENCY WARN: ll-020 exceeded latency gate: 14.18s > 3.0s
+
+[ret FAIL / ans FAIL] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+  answer missing: ['file path', 'line number', 'paragraph']
+[ret PASS / ans FAIL] ll-002
+  answer missing: ['CUSTOMER-RECORD', 'paragraph', 'line number']
+[ret PASS / ans FAIL] ll-003
+  answer missing: ['not found']
+[ret FAIL / ans FAIL] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+  answer missing: ['OPEN', 'READ', 'WRITE', 'file']
+[ret FAIL / ans FAIL] ll-005
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': ''}]
+  answer missing: ['CALL', 'dependency', 'module']
+[ret FAIL / ans FAIL] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]
+  answer missing: ['error', 'line number']
+[ret PASS / ans FAIL] ll-007
+  answer missing: ['PROCEDURE DIVISION', 'section']
+[ret FAIL / ans FAIL] ll-008
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/Variations/presql2o.cbl', 'paragraph_name': ''}]
+  answer missing: ['WORKING-STORAGE', 'variable', 'line number']
+[ret FAIL / ans FAIL] ll-009
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/mmap-sequential-indexed/mmapmatchfile.cbl', 'paragraph_name': ''}]
+  answer missing: ['FILE SECTION', 'DATA DIVISION', 'FD']
+[ret FAIL / ans FAIL] ll-010
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/gcic.cbl', 'paragraph_name': ''}]
+  answer missing: ['paragraph', 'line number', 'file path']
+[ret FAIL / ans FAIL] ll-011
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCSORT/tests/src/gctestrun2.cbl', 'paragraph_name': 'ST04-00'}]
+  answer missing: ['CALL', 'program', 'line number']
+[ret FAIL / ans FAIL] ll-012
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/TUI-TOOLS/GC99SCREENPAINTER.COB', 'paragraph_name': ''}]
+  answer missing: ['COPY', 'copybook', 'line number']
+[ret PASS / ans FAIL] ll-013
+  answer missing: ['USING', 'parameter', 'line number']
+[ret FAIL / ans FAIL] ll-014
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/GCic/v2.01-4/gcic.cbl', 'paragraph_name': 'L-PROCEDURE-NAME'}]
+  answer missing: ['CALL', 'entry', 'chain']
+[ret PASS / ans FAIL] ll-015
+  answer missing: ['not found']
+[ret FAIL / ans FAIL] ll-016
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/cntlines/cntlines.cbl', 'paragraph_name': ''}]
+  answer missing: ['file', 'line number']
+[ret FAIL / ans FAIL] ll-017
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example7/PGMOD7.cbl', 'paragraph_name': ''}]
+  answer missing: ['copybook', 'variable', 'COPY']
+[ret PASS / ans FAIL] ll-018
+  answer missing: ['not found']
+[ret PASS / ans FAIL] ll-019
+  answer missing: ['not found']
+[ret FAIL / ans FAIL] ll-020
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/HTML-CGI-GnuCOBOL/cust01.cbl', 'paragraph_name': ''}]
+  answer missing: ['validation', 'customer', 'line number']

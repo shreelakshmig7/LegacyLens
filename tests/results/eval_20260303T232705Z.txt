@@ -1,0 +1,44 @@
+LegacyLens Eval — 20260303T232705Z
+Total: 20
+Retrieval Precision: 20/20 (100.0%) — target >70%
+Answer Faithfulness (stub): 3/20
+
+[ret PASS / ans FAIL] ll-001
+  answer missing: ['file path', 'line number', 'paragraph']
+[ret PASS / ans FAIL] ll-002
+  answer missing: ['paragraph', 'line number']
+[ret PASS / ans FAIL] ll-003
+  answer missing: ['not found']
+  answer forbidden: ['CALCULATE-INTEREST']
+[ret PASS / ans FAIL] ll-004
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret PASS / ans FAIL] ll-006
+  answer missing: ['paragraph', 'line number']
+[ret PASS / ans PASS] ll-007
+[ret PASS / ans FAIL] ll-008
+  answer missing: ['line number']
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans FAIL] ll-010
+  answer missing: ['line number', 'file path']
+[ret PASS / ans FAIL] ll-011
+  answer missing: ['line number']
+[ret PASS / ans FAIL] ll-012
+  answer missing: ['line number']
+[ret PASS / ans FAIL] ll-013
+  answer missing: ['line number']
+[ret PASS / ans PASS] ll-014
+[ret PASS / ans FAIL] ll-015
+  answer missing: ['paragraph', 'line number']
+[ret PASS / ans FAIL] ll-016
+  answer missing: ['line number']
+[ret PASS / ans PASS] ll-017
+[ret PASS / ans FAIL] ll-018
+  answer missing: ['not found']
+  answer forbidden: ['xyzzy']
+[ret PASS / ans FAIL] ll-019
+  answer missing: ['paragraph', 'line number']
+[ret PASS / ans FAIL] ll-020
+  answer missing: ['line number']

@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 21 items
+
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_explicit PASSED [  4%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_call_chain PASSED [  9%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_copybooks PASSED [ 14%]
+tests/test_query_router.py::TestDetectFeatureType::test_dependency_query_using_clause PASSED [ 19%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_paragraph PASSED [ 23%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_purpose PASSED [ 28%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_query_describe PASSED [ 33%]
+tests/test_query_router.py::TestDetectFeatureType::test_business_logic_query_rules PASSED [ 38%]
+tests/test_query_router.py::TestDetectFeatureType::test_business_logic_query_validation PASSED [ 42%]
+tests/test_query_router.py::TestDetectFeatureType::test_explain_prefix_overrides_business_logic PASSED [ 47%]
+tests/test_query_router.py::TestDetectFeatureType::test_doc_generate_query PASSED [ 52%]
+tests/test_query_router.py::TestDetectFeatureType::test_doc_generate_auto_document PASSED [ 57%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_entry_point PASSED [ 61%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_file_io PASSED [ 66%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_modify PASSED [ 71%]
+tests/test_query_router.py::TestDetectFeatureType::test_general_query_error_handling PASSED [ 76%]
+tests/test_query_router.py::TestDetectFeatureType::test_empty_query_returns_general PASSED [ 80%]
+tests/test_query_router.py::TestDetectFeatureType::test_none_query_returns_general PASSED [ 85%]
+tests/test_query_router.py::TestDetectFeatureType::test_whitespace_query_returns_general PASSED [ 90%]
+tests/test_query_router.py::TestDetectFeatureType::test_case_insensitive PASSED [ 95%]
+tests/test_query_router.py::TestDetectFeatureType::test_priority_dependency_over_explain PASSED [100%]
+
+============================== 21 passed in 0.02s ==============================

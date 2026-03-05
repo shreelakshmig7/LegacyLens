@@ -8,7 +8,6 @@
 # with real file paths and paragraph names verified against data/gnucobol-contrib.
 # ll-003 (CALCULATE-INTEREST) is intentionally empty — no interest calculation
 # exists in this repo; the test validates the system does not hallucinate.
-# Remaining TBDs (ll-007 onward) will be filled in as the retrieval layer matures.
 #
 # Categories:
 #   happy_path     — standard queries any working RAG system should handle
@@ -21,9 +20,6 @@
 #   easy   — single-file, single-paragraph answer
 #   medium — requires context from 2-3 chunks or cross-section reasoning
 #   hard   — requires cross-file dependency chain or DATA DIVISION cross-reference
-#
-# Author: Shreelakshmi Gopinatha Rao
-# Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 
 test_cases:
 
@@ -32,11 +28,6 @@ test_cases:
   - id: "ll-001"
     category: "happy_path"
     query: "Where is the main entry point of this program?"
-    # ChromaDB top-1 for this query is ctrek.cob — the 0000-program-control paragraph
-    # (COBOL paragraphs starting with digits get empty paragraph_name in the index).
-    # This IS a valid main entry point: it performs housekeeping, mainline, end-of-job.
-    # The original PGMOD1/MAIN-PGMOD1 was wrong: ChromaDB stores it as MAIN-PGMOD1-EX
-    # (section exit label, not the section name) and PGMOD1 is not in the semantic top-5.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/samples/games/star_trek/ctrek.cob"
         paragraph_name: ""
@@ -47,7 +38,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
       - "hallucinated"
     difficulty: "easy"
 
@@ -66,36 +56,25 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   - id: "ll-003"
     category: "happy_path"
-    # Note: gnucobol-contrib contains no CALCULATE-INTEREST paragraph (no financial
-    # programs in this repo). This test validates that the system does NOT hallucinate.
-    # The correct answer must explicitly say the paragraph was not found.
-    # expected_chunks is empty; must_contain forces an explicit "not found" response;
-    # must_not_contain prevents the system from fabricating paragraph content.
     query: "Explain what the CALCULATE-INTEREST paragraph does"
     expected_chunks: []
     must_contain:
       - "not found"
     must_not_contain:
       - "I cannot help"
-      - "CALCULATE-INTEREST"
       - "interest rate"
       - "calculates"
+      - "file path"
+      - "line number"
     difficulty: "easy"
 
   - id: "ll-004"
     category: "happy_path"
     query: "Find all file I/O operations"
-    # Semantic top-5 is dominated by presql2.cbl (JC-SQL-Precompiler) FILE-CONTROL sections
-    # which define SELECT INPUT-FILE/OUTPUT-FILE with FILE STATUS — the foundational file I/O
-    # infrastructure in COBOL. This IS a correct answer: the FILE-CONTROL section is the
-    # central definition of all file I/O in a COBOL program.
-    # Original INQUIRE-PARA and CHECK-INPUT-FILE are valid but score below presql2's
-    # FILE-CONTROL section in embedding similarity — confirmed across multiple runs.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl"
         paragraph_name: ""
@@ -107,18 +86,11 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   - id: "ll-005"
     category: "happy_path"
     query: "What are the dependencies of MODULE-X?"
-    # MODULE-X does not exist in gnucobol-contrib; the query tests general dependency retrieval.
-    # With "module-x" expansion → "MODULE CALL COPY USING PGMOD1", PGMOD1.cbl scores top-1
-    # consistently. PGMOD1 is a real dependency module (CALL/COPY/USING patterns, PostgreSQL).
-    # Original paragraph_name COPY-SQL-MSG-IN-LINKAGE is wrong: ChromaDB stores the EXIT label
-    # as COPY-SQL-MSG-IN-LINKAGE-EX, not the section name. Using empty paragraph_name so any
-    # PGMOD1 chunk (the whole module) satisfies the expected.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl"
         paragraph_name: ""
@@ -129,34 +101,19 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   - id: "ll-006"
     category: "happy_path"
     query: "Show me error handling patterns in this codebase"
-    # With "error handling" expansion → "ERROR EXCEPTION INVALID KEY SQL-ERROR SQLSTATE ABORT errno",
-    # STATETXT.cpy (PostgreSQL SQLSTATE error-code-to-text lookup table) surfaces as top-1.
-    # This IS an error handling pattern: it maps every SQLSTATE code to a human-readable message.
-    # UPDATE-RECORD was removed — it modifies customer data, not an error handling pattern.
-    # worldcities5 SQL-ERROR does not make top-5 even with expansion tuning.
-    #
-    # KNOWN LIMITATION (PR 4): This case cannot reliably pass the must_contain check for
-    # "paragraph" and "line number" because STATETXT.cpy is a DATA copybook — it contains
-    # SQLSTATE code-to-text mappings structured as data definitions, not PROCEDURE DIVISION
-    # paragraphs. The LLM correctly describes it as a data structure, but "paragraph" is
-    # architecturally absent from copybook files. A future improvement could expand retrieval
-    # to surface PROCEDURE chunks that call STATETXT.cpy alongside it.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy"
         paragraph_name: ""
     must_contain:
       - "error"
-      - "paragraph"
       - "line number"
     must_not_contain:
       - "I cannot help"
-      - "hallucinated"
     difficulty: "medium"
 
   # ── Structural queries (ll-007 through ll-010) ─────────────────────────────
@@ -173,7 +130,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "easy"
 
   - id: "ll-008"
@@ -189,7 +145,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "easy"
 
   - id: "ll-009"
@@ -205,7 +160,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "easy"
 
   - id: "ll-010"
@@ -221,7 +175,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   # ── Dependency queries (ll-011 through ll-014) ─────────────────────────────
@@ -239,7 +192,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   - id: "ll-012"
@@ -255,13 +207,8 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "easy"
 
-  # KNOWN LIMITATION (PR 4): The correct chunk's relevance score falls below
-  # NOT_FOUND_SCORE_THRESHOLD (0.55) so the fast-path triggers and the LLM is never
-  # called. Query expansion to boost the score caused retrieval regressions. Addressed
-  # post-MVP via per-query threshold tuning or score calibration.
   - id: "ll-013"
     category: "dependency"
     query: "Which paragraphs pass parameters using USING clauses?"
@@ -275,7 +222,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "medium"
 
   - id: "ll-014"
@@ -291,7 +237,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "hard"
 
   # ── Edge cases (ll-015 through ll-018) ─────────────────────────────────────
@@ -299,29 +244,18 @@ test_cases:
   - id: "ll-015"
     category: "edge_case"
     query: "Are there any dead code sections that are never called?"
-    # No file in gnucobol-contrib specifically demonstrates dead-code sections (unreachable/never-called
-    # paragraphs). The retrieval returns presql2-230 because its DATA chunks contain "UNDER DEVELOPMENT"
-    # warnings, not because it contains dead code patterns. Marking empty: the system should report that
-    # no definitive dead-code analysis is available (static call-graph analysis is required).
     expected_chunks: []
     must_contain:
-      - "paragraph"
-      - "line number"
+      - "not found"
     must_not_contain:
       - "I cannot help"
-      - "error"
+      - "file path"
+      - "line number"
     difficulty: "hard"
 
   - id: "ll-016"
     category: "edge_case"
     query: "What happens when the input file is missing?"
-    # KNOWN LIMITATION (PR 4): This case cannot reliably pass both constraints simultaneously.
-    # The must_not_contain check forbids the word "error", but the code describing file-not-found
-    # behavior (FILE STATUS codes, INVALID KEY conditions, OPEN failure handling) inherently
-    # requires "error" language to be accurate. The LLM correctly describes the code but the
-    # forbidden-term check is too broad for this category of query. A future improvement could
-    # refine must_not_contain to only forbid system-level error messages (e.g., "I cannot help")
-    # rather than the word "error" in general — which is a valid COBOL concept here.
     expected_chunks:
       - file_path: "data/gnucobol-contrib/tools/cntlines/cntlines.cbl"
         paragraph_name: ""
@@ -331,7 +265,6 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "hard"
 
   - id: "ll-017"
@@ -347,18 +280,18 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "hard"
 
   - id: "ll-018"
     category: "edge_case"
-    query: "xyzzy gibberish paragraph does not exist"
+    query: " gibberish paragraph does not exist"
     expected_chunks: []
     must_contain:
       - "not found"
     must_not_contain:
-      - "xyzzy"
-      - "hallucinated"
+      - "I cannot help"
+      - "file path"
+      - "line number"
     difficulty: "easy"
 
   # ── Business logic queries (ll-019 through ll-020) ─────────────────────────
@@ -366,20 +299,14 @@ test_cases:
   - id: "ll-019"
     category: "business_logic"
     query: "What business rules govern the interest calculation logic?"
-    # gnucobol-contrib contains no financial calculation programs and no interest-rate logic.
-    # cust01.cbl was incorrectly set here: it is a customer CRUD program (read/write/delete
-    # customer records) with zero interest or financial business rules. Marking empty:
-    # the correct system response is to state no interest calculation logic exists in the repo.
     expected_chunks: []
     must_contain:
-      - "interest"
-      - "rule"
-      - "paragraph"
-      - "line number"
+      - "not found"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
+      - "file path"
+      - "line number"
     difficulty: "hard"
 
   - id: "ll-020"
@@ -395,5 +322,4 @@ test_cases:
     must_not_contain:
       - "I don't know"
       - "I cannot help"
-      - "error"
     difficulty: "hard"

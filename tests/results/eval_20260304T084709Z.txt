@@ -1,0 +1,46 @@
+LegacyLens Eval — 20260304T084709Z
+Total: 20
+Retrieval Precision: 20/20 (100.0%) — target >70%
+Answer Faithfulness: 15/20 (75.0%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 6.73s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 6.14s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 10.72s > 3.0s
+  LATENCY WARN: ll-005 exceeded latency gate: 7.78s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 3.99s > 3.0s
+  LATENCY WARN: ll-007 exceeded latency gate: 15.71s > 3.0s
+  LATENCY WARN: ll-008 exceeded latency gate: 3.44s > 3.0s
+  LATENCY WARN: ll-009 exceeded latency gate: 5.12s > 3.0s
+  LATENCY WARN: ll-010 exceeded latency gate: 9.93s > 3.0s
+  LATENCY WARN: ll-011 exceeded latency gate: 6.12s > 3.0s
+  LATENCY WARN: ll-014 exceeded latency gate: 19.14s > 3.0s
+  LATENCY WARN: ll-016 exceeded latency gate: 6.76s > 3.0s
+  LATENCY WARN: ll-017 exceeded latency gate: 24.17s > 3.0s
+  LATENCY WARN: ll-019 exceeded latency gate: 5.16s > 3.0s
+  LATENCY WARN: ll-020 exceeded latency gate: 5.53s > 3.0s
+
+[ret PASS / ans PASS] ll-001
+[ret PASS / ans PASS] ll-002
+[ret PASS / ans PASS] ll-003
+[ret PASS / ans FAIL] ll-004
+  answer missing: ['OPEN', 'READ', 'WRITE']
+[ret PASS / ans FAIL] ll-005
+  answer missing: ['CALL', 'dependency']
+[ret PASS / ans FAIL] ll-006
+  answer missing: ['paragraph']
+[ret PASS / ans PASS] ll-007
+[ret PASS / ans PASS] ll-008
+[ret PASS / ans FAIL] ll-009
+  answer missing: ['FD']
+[ret PASS / ans PASS] ll-010
+[ret PASS / ans PASS] ll-011
+[ret PASS / ans PASS] ll-012
+[ret PASS / ans FAIL] ll-013
+  answer missing: ['USING', 'parameter']
+[ret PASS / ans PASS] ll-014
+[ret PASS / ans PASS] ll-015
+[ret PASS / ans PASS] ll-016
+[ret PASS / ans PASS] ll-017
+[ret PASS / ans PASS] ll-018
+[ret PASS / ans PASS] ll-019
+[ret PASS / ans PASS] ll-020

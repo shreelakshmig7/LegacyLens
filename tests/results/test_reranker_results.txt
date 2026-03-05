@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 8 items
+
+tests/test_reranker.py::test_rerank_returns_list PASSED                  [ 12%]
+tests/test_reranker.py::test_rerank_does_not_mutate_input PASSED         [ 25%]
+tests/test_reranker.py::test_rerank_empty_input_returns_empty PASSED     [ 37%]
+tests/test_reranker.py::test_rerank_boosts_paragraph_name_match PASSED   [ 50%]
+tests/test_reranker.py::test_rerank_paragraph_boost_case_insensitive PASSED [ 62%]
+tests/test_reranker.py::test_rerank_deprioritizes_data_for_logic_query PASSED [ 75%]
+tests/test_reranker.py::test_rerank_non_logic_query_does_not_deprioritize_data PASSED [ 87%]
+tests/test_reranker.py::test_rerank_sorts_by_adjusted_score_descending PASSED [100%]
+
+============================== 8 passed in 0.03s ===============================

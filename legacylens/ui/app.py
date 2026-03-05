@@ -549,59 +549,54 @@ def main() -> None:
     # Run search when Search clicked or example triggered
     if st.session_state.get(KEY_RUN_SEARCH) and (query or st.session_state.get(KEY_QUERY_INPUT)):
         st.session_state[KEY_SEARCH_RAN_THIS_RUN] = True
-        st.session_state[KEY_SKIP_NEXT_LAST_RESULT] = True  # avoid duplicate on next rerun
+        st.session_state[KEY_SKIP_NEXT_LAST_RESULT] = True
         st.session_state[KEY_LAST_METADATA] = None
-        st.session_state[KEY_LAST_ANSWER] = ""
-        st.session_state[KEY_SELECTED_CHUNK_INDEX] = None  # Reset selection on new search
+        st.session_state[KEY_LAST_ANSWER] = None
+        st.session_state[KEY_STREAM_ERROR] = None
+        st.session_state[KEY_SELECTED_CHUNK_INDEX] = None
         q = query or st.session_state.get(KEY_QUERY_INPUT, "")
         st.session_state[KEY_RUN_SEARCH] = False
         if not q.strip():
             st.warning("Enter a query first.")
         else:
             base_url = LEGACYLENS_API_URL
-            status_placeholder = st.empty()
-            answer_placeholder = st.empty()
-            chunks_placeholder = st.container()
 
-            # Stream with status updates (status and answer update as data arrives)
-            status_placeholder.info("Connecting...")
-            metadata, answer_text, error_msg = _stream_query_stream(
-                base_url, q,
-                status_placeholder=status_placeholder,
-                answer_placeholder=answer_placeholder,
-            )
+            with st.spinner("Searching and analyzing codebase..."):
+                metadata, answer_text, error_msg = _stream_query_stream(
+                    base_url, q,
+                )
 
             if error_msg:
-                status_placeholder.empty()
-                st.error(error_msg)
+                st.session_state[KEY_STREAM_ERROR] = f"Unexpected error: {error_msg}"
+                st.error(st.session_state[KEY_STREAM_ERROR])
             else:
-                status_placeholder.empty()
                 if metadata:
                     st.subheader("Answer")
-                    answer_placeholder.markdown(answer_text)
+                    st.markdown(answer_text)
                     st.session_state[KEY_LAST_ANSWER] = answer_text
                     if _has_retrieved_chunks(metadata):
                         st.session_state[KEY_LAST_METADATA] = metadata
                         with st.expander("Retrieved chunks", expanded=False):
                             _render_chunks(metadata, base_url=LEGACYLENS_API_URL)
                     else:
-                        # Explicitly clear previously shown snippets when current
-                        # response has no retrieved chunks (e.g., out-of-scope).
                         st.session_state[KEY_LAST_METADATA] = None
                 else:
-                    answer_placeholder.markdown(answer_text or "(No answer returned.)")
+                    st.markdown(answer_text or "(No answer returned.)")
                     st.session_state[KEY_LAST_ANSWER] = answer_text
                     st.session_state[KEY_LAST_METADATA] = None
 
     # Show last result when we didn't run a search this run; skip one run after a search to avoid duplicate
     skip_next = st.session_state.pop(KEY_SKIP_NEXT_LAST_RESULT, None)
     if skip_next:
-        pass  # skip showing last result this run (immediate rerun after search)
-    elif st.session_state.get(KEY_LAST_METADATA):
+        pass
+    elif st.session_state.get(KEY_STREAM_ERROR):
+        st.error(st.session_state[KEY_STREAM_ERROR])
+    elif st.session_state.get(KEY_LAST_ANSWER):
         st.subheader("Answer")
-        st.markdown(st.session_state.get(KEY_LAST_ANSWER, ""))
-        with st.expander("Retrieved chunks", expanded=False):
-            _render_chunks(st.session_state[KEY_LAST_METADATA], base_url=LEGACYLENS_API_URL)
+        st.markdown(st.session_state[KEY_LAST_ANSWER])
+        if st.session_state.get(KEY_LAST_METADATA):
+            with st.expander("Retrieved chunks", expanded=False):
+                _render_chunks(st.session_state[KEY_LAST_METADATA], base_url=LEGACYLENS_API_URL)
 
 
 if __name__ == "__main__":

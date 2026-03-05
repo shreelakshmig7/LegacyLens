@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/shreelakshmigopinatharao/LegacyLens/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+plugins: anyio-4.12.1, asyncio-0.23.8
+asyncio: mode=strict
+collecting ... collected 7 items
+
+tests/test_searcher.py::test_search_returns_success_dict PASSED          [ 14%]
+tests/test_searcher.py::test_search_data_has_results_list PASSED         [ 28%]
+tests/test_searcher.py::test_search_results_have_text_metadata_score PASSED [ 42%]
+tests/test_searcher.py::test_search_respects_top_k PASSED                [ 57%]
+tests/test_searcher.py::test_search_metadata_has_file_path_and_paragraph_name PASSED [ 71%]
+tests/test_searcher.py::test_search_returns_at_least_one_result_for_known_topic PASSED [ 85%]
+tests/test_searcher.py::test_search_empty_query_returns_structured_result PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_searcher.py::test_search_returns_success_dict
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+    warnings.warn(
+
+tests/test_searcher.py: 12 warnings
+  /Users/shreelakshmigopinatharao/LegacyLens/.venv/lib/python3.9/site-packages/chromadb/types.py:144: PydanticDeprecatedSince211: Accessing the 'model_fields' attribute on the instance is deprecated. Instead, you should access this attribute from the model class. Deprecated in Pydantic V2.11 to be removed in V3.0.
+    return self.model_fields  # pydantic 2.x
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 7 passed, 13 warnings in 2.60s ========================

@@ -145,7 +145,15 @@ Never say "I don't know" or "I cannot help". Either answer with cited sources or
 use the exact phrase "not found".
 
 RULE 9 — STRUCTURE:
-Lead with the most relevant source. Cite GitHub links inline next to file paths.\
+Lead with the most relevant source. Cite GitHub links inline next to file paths.
+
+RULE 10 — COMPOUND QUERIES:
+If the user's question contains multiple distinct sub-questions, topics, or COBOL \
+entities, you MUST address each one separately in your response. If the provided \
+CONTEXT blocks contain information for one part of the question but not another, \
+answer the part you can and explicitly state that no specific information was \
+found for the remaining part(s) using the "not found" phrasing from RULE 5. \
+Never silently ignore any portion of the user's request.\
 """
 
 # Fallback message returned by the fast-path when all scores are too low.
