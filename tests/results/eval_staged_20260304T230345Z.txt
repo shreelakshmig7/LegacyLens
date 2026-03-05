@@ -1,0 +1,12 @@
+LegacyLens Staged Eval — 20260304T230345Z
+Fast mode: ON
+
+[stage_1_bm25_baseline] mode=bm25 retr=33.3% ans=66.7% latency=FAIL overall=FAIL
+  detailed_results: /Users/shreelakshmigopinatharao/LegacyLens/tests/results/eval_20260304T230236Z.txt
+[stage_2_vector_only] mode=vector_only retr=33.3% ans=50.0% latency=FAIL overall=FAIL
+  detailed_results: /Users/shreelakshmigopinatharao/LegacyLens/tests/results/eval_20260304T230258Z.txt
+[stage_3_hybrid] mode=hybrid retr=33.3% ans=50.0% latency=FAIL overall=FAIL
+  detailed_results: /Users/shreelakshmigopinatharao/LegacyLens/tests/results/eval_20260304T230320Z.txt
+[stage_4_full_pipeline] mode=hybrid retr=33.3% ans=50.0% latency=FAIL overall=FAIL
+  detailed_results: /Users/shreelakshmigopinatharao/LegacyLens/tests/results/eval_20260304T230345Z.txt
+

@@ -70,7 +70,9 @@ def _is_valid_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     for field in MANDATORY_METADATA_FIELDS:
         if field not in metadata:
             return {"valid": False, "reason": f"Missing mandatory metadata field: {field}"}
-    non_empty_fields = ("file_path", "file_name", "line_range", "type", "parent_section")
+    # parent_section is legitimately empty for COPYBOOK and top-level DATA DIVISION chunks;
+    # its presence is already enforced by the MANDATORY_METADATA_FIELDS key check above.
+    non_empty_fields = ("file_path", "file_name", "line_range", "type")
     for field in non_empty_fields:
         if str(metadata.get(field, "")).strip() == "":
             return {"valid": False, "reason": f"Mandatory metadata field is empty: {field}"}
@@ -173,8 +175,9 @@ def sanitize_query_filters(filters: Dict[str, Any]) -> dict:
     """
     Validate a ChromaDB where-filter dict before it touches the database.
 
-    Rejects filters that contain non-whitelisted field names or keys that begin
-    with $ (ChromaDB operator injection).
+    Allows ``$and`` and ``$or`` logical operators (ChromaDB compound filters)
+    while rejecting arbitrary operator injection.  Each sub-clause inside a
+    compound operator is validated recursively.
 
     Args:
         filters: A dict intended for use as a ChromaDB where= filter.
@@ -186,7 +189,23 @@ def sanitize_query_filters(filters: Dict[str, Any]) -> dict:
             "error": None | str,
         }
     """
+    _ALLOWED_LOGICAL_OPS = frozenset({"$and", "$or"})
+
     for key in filters:
+        if key in _ALLOWED_LOGICAL_OPS:
+            clauses = filters[key]
+            if not isinstance(clauses, list):
+                return {
+                    "success": False,
+                    "data": None,
+                    "error": f"Logical operator {key!r} value must be a list",
+                }
+            for clause in clauses:
+                sub = sanitize_query_filters(clause)
+                if not sub["success"]:
+                    return sub
+            continue
+
         if key.startswith("$"):
             return {
                 "success": False,
@@ -266,6 +285,8 @@ def insert_chunks(
                 "dependencies": ",".join(chunk.get("dependencies", [])),
                 "comment_weight": float(chunk.get("comment_weight", 1.0)),
                 "dead_code_flag": bool(chunk.get("dead_code_flag", False)),
+                "file_hash": str(chunk.get("file_hash", "")),
+                "security_flag": bool(chunk.get("security_flag", False)),
             }
             clean_meta = sanitize_metadata(raw_meta, repo_root=repo_root)
             meta_check = _is_valid_metadata(clean_meta)

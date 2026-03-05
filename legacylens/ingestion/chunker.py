@@ -34,6 +34,7 @@ Project: LegacyLens — RAG System for Legacy Enterprise Codebases
 """
 
 import logging
+import math
 import pathlib
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -82,7 +83,34 @@ def _estimate_tokens(text: str) -> int:
         int: Estimated token count (words / 0.75, rounded up).
     """
     words = len(text.split())
-    return max(1, int(words / 0.75))
+    return max(1, int(math.ceil(words / 0.75)))
+
+
+def _split_oversized_line(line: str) -> List[str]:
+    """
+    Split one oversized source line into token-safe pseudo-lines.
+
+    This keeps every source token represented in downstream chunks, avoiding
+    embedder-side drops for single lines that exceed MAX_CHUNK_TOKENS.
+
+    Args:
+        line: One source line of code.
+
+    Returns:
+        list[str]: One or more pseudo-lines, each estimated <= MAX_CHUNK_TOKENS.
+    """
+    if _estimate_tokens(line) <= MAX_CHUNK_TOKENS:
+        return [line]
+
+    words = line.split()
+    if not words:
+        return [line]
+
+    max_words_per_part = max(1, int(MAX_CHUNK_TOKENS * 0.75))
+    parts: List[str] = []
+    for i in range(0, len(words), max_words_per_part):
+        parts.append(" ".join(words[i : i + max_words_per_part]))
+    return parts
 
 
 # ---------------------------------------------------------------------------
@@ -112,25 +140,34 @@ def _fixed_size_chunks(
         list[dict]: List of chunk dicts, each with text + full metadata schema.
     """
     chunks: List[Dict[str, Any]] = []
+
+    # Expand any single oversized line into token-safe pseudo-lines while
+    # preserving the original source line number in metadata coverage.
+    expanded_lines: List[Tuple[str, int]] = []
+    for idx, line in enumerate(lines):
+        source_line_no = start_line + idx
+        for line_part in _split_oversized_line(line):
+            expanded_lines.append((line_part, source_line_no))
+
     i = 0
-    while i < len(lines):
+    while i < len(expanded_lines):
         # Collect lines until we reach MAX_CHUNK_TOKENS
         chunk_lines: List[str] = []
         token_count = 0
         j = i
-        while j < len(lines):
-            line_tokens = _estimate_tokens(lines[j])
+        while j < len(expanded_lines):
+            line_tokens = _estimate_tokens(expanded_lines[j][0])
             if chunk_lines and token_count + line_tokens > MAX_CHUNK_TOKENS:
                 break
-            chunk_lines.append(lines[j])
+            chunk_lines.append(expanded_lines[j][0])
             token_count += line_tokens
             j += 1
 
         if not chunk_lines:
             break
 
-        chunk_start = start_line + i - 1
-        chunk_end = start_line + j - 2
+        chunk_start = expanded_lines[i][1]
+        chunk_end = expanded_lines[j - 1][1]
 
         chunks.append({
             "text": "\n".join(chunk_lines),
@@ -322,12 +359,16 @@ def _paragraph_chunks(
     def flush_data(lines: List[str], start: int) -> None:
         if not lines:
             return
+        # Fall back to "DATA DIVISION" when no DIVISION/SECTION header has been seen
+        # yet (current_section is still the initial empty string). This preserves the
+        # PRD §3.4 requirement that parent_section is always non-empty for DATA chunks.
+        section = current_section or "DATA DIVISION"
         sub = _fixed_size_chunks(
             lines,
             start,
             file_path,
             chunk_type_data,
-            current_section,
+            section,
             comment_weight=comment_weight,
             dead_code_flag=dead_code_flag,
         )
@@ -433,16 +474,21 @@ def chunk_code_lines(
     is_copybook: bool = False,
     comment_density: float = 0.0,
     dead_code_flag: bool = False,
+    file_hash: str = "",
+    security_flag: bool = False,
 ) -> dict:
     """
     Chunk a list of preprocessed COBOL code lines into embedding-ready segments.
 
     Args:
-        code_lines:  List of cleaned code lines (output of preprocessor).
-        file_path:   Path to the source file — stored in chunk metadata.
-        is_copybook: If True, all chunks receive type=CHUNK_TYPE_COPYBOOK regardless
-                     of division. Copybooks define shared data and logic that is
-                     included by parent programs via COPY statements.
+        code_lines:    List of cleaned code lines (output of preprocessor).
+        file_path:     Path to the source file — stored in chunk metadata.
+        is_copybook:   If True, all chunks receive type=CHUNK_TYPE_COPYBOOK regardless
+                       of division. Copybooks define shared data and logic that is
+                       included by parent programs via COPY statements.
+        file_hash:     SHA-256 hex digest of the raw source file (from preprocessor).
+                       Attached to every chunk for version integrity tracking.
+        security_flag: True when PII patterns were detected and redacted in the source.
 
     Returns:
         dict: {
@@ -487,6 +533,11 @@ def chunk_code_lines(
 
         # Filter out empty chunks that might have slipped through
         chunks = [c for c in raw_chunks if c["text"].strip()]
+
+        # Attach file-level metadata to every chunk
+        for c in chunks:
+            c["file_hash"] = file_hash
+            c["security_flag"] = security_flag
 
         logger.debug("Chunked %s: %d chunks produced", file_path, len(chunks))
 
@@ -545,6 +596,8 @@ def chunk_file(file_path: str) -> dict:
             is_copybook=is_copybook,
             comment_density=float(preprocess_result["data"].get("comment_density", 0.0)),
             dead_code_flag=bool(preprocess_result["data"].get("dead_code_flag", False)),
+            file_hash=str(preprocess_result["data"].get("file_hash", "")),
+            security_flag=bool(preprocess_result["data"].get("security_flag", False)),
         )
 
     except Exception as exc:

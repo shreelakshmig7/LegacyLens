@@ -1,0 +1,62 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Library/Developer/CommandLineTools/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/shreelakshmigopinatharao/LegacyLens
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.23.8, langsmith-0.4.37
+asyncio: mode=strict
+collecting ... collected 51 items
+
+tests/test_chunker.py::test_chunk_file_returns_success_dict PASSED       [  1%]
+tests/test_chunker.py::test_data_contains_chunks_list PASSED             [  3%]
+tests/test_chunker.py::test_nonexistent_file_returns_failure PASSED      [  5%]
+tests/test_chunker.py::test_every_chunk_has_required_metadata PASSED     [  7%]
+tests/test_chunker.py::test_chunk_text_field_present PASSED              [  9%]
+tests/test_chunker.py::test_line_range_is_valid_tuple PASSED             [ 11%]
+tests/test_chunker.py::test_file_path_in_metadata PASSED                 [ 13%]
+tests/test_chunker.py::test_paragraph_names_captured PASSED              [ 15%]
+tests/test_chunker.py::test_known_paragraph_present PASSED               [ 17%]
+tests/test_chunker.py::test_no_mid_paragraph_split PASSED                [ 19%]
+tests/test_chunker.py::test_chunk_types_are_valid PASSED                 [ 21%]
+tests/test_chunker.py::test_copybook_chunks_have_copybook_type PASSED    [ 23%]
+tests/test_chunker.py::test_fixed_size_fallback_via_lines PASSED         [ 25%]
+tests/test_chunker.py::test_fixed_size_chunks_respect_max_token_limit PASSED [ 27%]
+tests/test_chunker.py::test_fixed_size_chunks_have_overlap PASSED        [ 29%]
+tests/test_chunker.py::test_oversized_paragraph_split_into_subchunks PASSED [ 31%]
+tests/test_chunker.py::test_oversized_procedure_paragraph_never_produces_overlimit_chunk PASSED [ 33%]
+tests/test_chunker.py::test_chunk_count_reasonable_for_dumphex PASSED    [ 35%]
+tests/test_chunker.py::test_chunk_file_attaches_file_hash PASSED         [ 37%]
+tests/test_chunker.py::test_all_chunks_from_same_file_share_file_hash PASSED [ 39%]
+tests/test_chunker.py::test_chunk_file_attaches_security_flag PASSED     [ 41%]
+tests/test_chunker.py::test_data_chunks_before_any_section_get_data_division_fallback PASSED [ 43%]
+tests/test_chunker.py::test_data_chunks_with_explicit_section_keep_section_name PASSED [ 45%]
+tests/test_preprocessor.py::test_preprocess_returns_success_dict PASSED  [ 47%]
+tests/test_preprocessor.py::test_data_has_required_keys PASSED           [ 49%]
+tests/test_preprocessor.py::test_nonexistent_file_returns_failure PASSED [ 50%]
+tests/test_preprocessor.py::test_sequence_numbers_stripped PASSED        [ 52%]
+tests/test_preprocessor.py::test_sequence_strip_via_lines PASSED         [ 54%]
+tests/test_preprocessor.py::test_identification_area_stripped PASSED     [ 56%]
+tests/test_preprocessor.py::test_identification_area_via_lines PASSED    [ 58%]
+tests/test_preprocessor.py::test_comment_lines_not_in_code PASSED        [ 60%]
+tests/test_preprocessor.py::test_comment_lines_extracted PASSED          [ 62%]
+tests/test_preprocessor.py::test_comment_extraction_via_lines PASSED     [ 64%]
+tests/test_preprocessor.py::test_continuation_lines_joined PASSED        [ 66%]
+tests/test_preprocessor.py::test_debug_lines_not_in_code PASSED          [ 68%]
+tests/test_preprocessor.py::test_no_trailing_whitespace_in_code_lines PASSED [ 70%]
+tests/test_preprocessor.py::test_blank_lines_excluded PASSED             [ 72%]
+tests/test_preprocessor.py::test_preprocess_handles_encoding_errors PASSED [ 74%]
+tests/test_preprocessor.py::test_line_count_is_accurate PASSED           [ 76%]
+tests/test_preprocessor.py::test_file_hash_present_in_result PASSED      [ 78%]
+tests/test_preprocessor.py::test_file_hash_is_valid_sha256_hex PASSED    [ 80%]
+tests/test_preprocessor.py::test_file_hash_stable_across_calls PASSED    [ 82%]
+tests/test_preprocessor.py::test_security_flag_false_for_clean_code PASSED [ 84%]
+tests/test_preprocessor.py::test_pii_ipv4_address_detected PASSED        [ 86%]
+tests/test_preprocessor.py::test_pii_ssn_pattern_detected PASSED         [ 88%]
+tests/test_preprocessor.py::test_pii_redaction_replaces_ip_in_code_lines PASSED [ 90%]
+tests/test_preprocessor.py::test_bare_version_string_not_flagged_as_ip PASSED [ 92%]
+tests/test_preprocessor.py::test_unquoted_dotted_numeric_not_flagged PASSED [ 94%]
+tests/test_preprocessor.py::test_ip_inside_string_literal_is_detected PASSED [ 96%]
+tests/test_preprocessor.py::test_pic_style_ssn_pattern_not_flagged PASSED [ 98%]
+tests/test_preprocessor.py::test_ssn_inside_string_literal_is_detected PASSED [100%]
+
+============================== 51 passed in 0.08s ==============================

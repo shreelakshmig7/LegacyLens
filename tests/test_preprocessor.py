@@ -249,3 +249,189 @@ def test_line_count_is_accurate() -> None:
     result = _preprocess(DUMPHEX)
     data = result["data"]
     assert data["line_count"] == len(data["code_lines"])
+
+
+# ---------------------------------------------------------------------------
+# file_hash (SHA-256 of raw file bytes)
+# ---------------------------------------------------------------------------
+
+def test_file_hash_present_in_result() -> None:
+    """preprocess_file must return a file_hash key in its data dict."""
+    result = _preprocess(DUMPHEX)
+    assert "file_hash" in result["data"], "file_hash must be returned by preprocess_file"
+
+
+def test_file_hash_is_valid_sha256_hex() -> None:
+    """file_hash must be a 64-character lowercase hex string (SHA-256 digest)."""
+    result = _preprocess(DUMPHEX)
+    fh = result["data"]["file_hash"]
+    assert isinstance(fh, str)
+    assert len(fh) == 64, f"Expected 64-char hex, got len={len(fh)}"
+    assert all(c in "0123456789abcdef" for c in fh), "file_hash contains non-hex chars"
+
+
+def test_file_hash_stable_across_calls() -> None:
+    """The same file must produce the same hash on repeated calls."""
+    r1 = _preprocess(DUMPHEX)
+    r2 = _preprocess(DUMPHEX)
+    assert r1["data"]["file_hash"] == r2["data"]["file_hash"]
+
+
+# ---------------------------------------------------------------------------
+# security_flag — PII detection and redaction
+# ---------------------------------------------------------------------------
+
+def test_security_flag_false_for_clean_code() -> None:
+    """security_flag must be False when no PII patterns are present."""
+    raw = [
+        "000010 IDENTIFICATION DIVISION.\n",
+        "000020 PROGRAM-ID. CLEAN.\n",
+        "000030 DATA DIVISION.\n",
+        "000040 WORKING-STORAGE SECTION.\n",
+        "000050 01 WS-COUNTER PIC 9(4).\n",
+        "000060 PROCEDURE DIVISION.\n",
+        "000070 MAIN.\n",
+        "000080     MOVE 0 TO WS-COUNTER.\n",
+        "000090     STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is False
+
+
+def test_pii_ipv4_address_detected() -> None:
+    """An IPv4 address literal in code lines must set security_flag=True."""
+    raw = [
+        "000010 IDENTIFICATION DIVISION.\n",
+        "000020 DATA DIVISION.\n",
+        "000030 WORKING-STORAGE SECTION.\n",
+        "000040 01 WS-HOST PIC X(20) VALUE '192.168.1.100'.\n",
+        "000050 PROCEDURE DIVISION.\n",
+        "000060 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is True, (
+        "security_flag must be True when an IPv4 address is present in source"
+    )
+
+
+def test_pii_ssn_pattern_detected() -> None:
+    """An SSN-like literal (NNN-NN-NNNN) must set security_flag=True."""
+    raw = [
+        "000010 IDENTIFICATION DIVISION.\n",
+        "000020 DATA DIVISION.\n",
+        "000030 WORKING-STORAGE SECTION.\n",
+        "000040 01 WS-SSN PIC X(11) VALUE '123-45-6789'.\n",
+        "000050 PROCEDURE DIVISION.\n",
+        "000060 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is True
+
+
+def test_pii_redaction_replaces_ip_in_code_lines() -> None:
+    """The IPv4 address must be replaced with [REDACTED] in the code_lines output."""
+    raw = [
+        "000010 DATA DIVISION.\n",
+        "000020 WORKING-STORAGE SECTION.\n",
+        "000030 01 WS-HOST PIC X(20) VALUE '10.0.0.1'.\n",
+        "000040 PROCEDURE DIVISION.\n",
+        "000050 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    combined = " ".join(result["data"]["code_lines"])
+    assert "10.0.0.1" not in combined, "Raw IP address must not appear in code_lines after redaction"
+    assert "[REDACTED-IP]" in combined, "IP redaction placeholder must appear in code_lines"
+
+
+# ---------------------------------------------------------------------------
+# Tightened IP regex — must NOT fire on COBOL version/dotted numeric literals
+# ---------------------------------------------------------------------------
+
+def test_bare_version_string_not_flagged_as_ip() -> None:
+    """COBOL dotted version literals (e.g. 2.1.4.0) without quotes must NOT set security_flag."""
+    raw = [
+        "000010 IDENTIFICATION DIVISION.\n",
+        "000020 PROGRAM-ID. VTEST.\n",
+        "000030 DATA DIVISION.\n",
+        "000040 WORKING-STORAGE SECTION.\n",
+        "000050 01 WS-VER PIC X(10) VALUE 2.1.4.0.\n",
+        "000060 PROCEDURE DIVISION.\n",
+        "000070 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is False, (
+        "COBOL version string 2.1.4.0 (unquoted) must not trigger IP detection"
+    )
+
+
+def test_unquoted_dotted_numeric_not_flagged() -> None:
+    """An unquoted dotted-decimal like 0.0.0.0 (e.g. initialiser) must NOT trigger IP flag."""
+    raw = [
+        "000010 DATA DIVISION.\n",
+        "000020 WORKING-STORAGE SECTION.\n",
+        "000030 01 WS-ADDR PIC X(15) VALUE 0.0.0.0.\n",
+        "000040 PROCEDURE DIVISION.\n",
+        "000050 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is False, (
+        "Unquoted 0.0.0.0 must not trigger IP detection"
+    )
+
+
+def test_ip_inside_string_literal_is_detected() -> None:
+    """A real IP address inside a quoted string literal must set security_flag=True."""
+    raw = [
+        "000010 DATA DIVISION.\n",
+        "000020 WORKING-STORAGE SECTION.\n",
+        "000030 01 WS-HOST PIC X(15) VALUE '10.10.50.200'.\n",
+        "000040 PROCEDURE DIVISION.\n",
+        "000050 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is True, (
+        "IP address inside a quoted literal must set security_flag=True"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tightened SSN regex — must NOT fire on unquoted PIC-style patterns
+# ---------------------------------------------------------------------------
+
+def test_pic_style_ssn_pattern_not_flagged() -> None:
+    """An SSN-like pattern in a PIC clause without quotes must NOT set security_flag."""
+    raw = [
+        "000010 DATA DIVISION.\n",
+        "000020 WORKING-STORAGE SECTION.\n",
+        "000030 01 WS-SSN PIC 999-99-9999.\n",
+        "000040 PROCEDURE DIVISION.\n",
+        "000050 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is False, (
+        "SSN-like PIC pattern without quotes must not set security_flag"
+    )
+
+
+def test_ssn_inside_string_literal_is_detected() -> None:
+    """An SSN inside a quoted VALUE literal must set security_flag=True."""
+    raw = [
+        "000010 DATA DIVISION.\n",
+        "000020 WORKING-STORAGE SECTION.\n",
+        "000030 01 WS-SSN PIC X(11) VALUE '987-65-4321'.\n",
+        "000040 PROCEDURE DIVISION.\n",
+        "000050 MAIN. STOP RUN.\n",
+    ]
+    result = _preprocess_lines(raw)
+    assert result["success"] is True
+    assert result["data"]["security_flag"] is True, (
+        "SSN inside a quoted literal must set security_flag=True"
+    )

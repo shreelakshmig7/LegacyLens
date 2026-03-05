@@ -270,6 +270,30 @@ def test_oversized_paragraph_split_into_subchunks() -> None:
     )
 
 
+def test_oversized_procedure_paragraph_never_produces_overlimit_chunk() -> None:
+    """Oversized PROCEDURE paragraphs must use fixed-size fallback and stay <= MAX_CHUNK_TOKENS."""
+    from legacylens.config.constants import MAX_CHUNK_TOKENS
+
+    body_lines = [f"           MOVE INPUT-{i:04d} TO OUTPUT-{i:04d}." for i in range(650)]
+    code_lines = [
+        "       IDENTIFICATION DIVISION.",
+        "       PROGRAM-ID. NOSKIP.",
+        "       PROCEDURE DIVISION.",
+        "       HUGE-PARA.",
+    ] + body_lines
+
+    result = _chunk_lines(code_lines, file_path="noskip.cbl")
+    assert result["success"] is True
+    chunks = [c for c in result["data"]["chunks"] if c.get("type") == "PROCEDURE"]
+    assert len(chunks) >= 2, "Expected fixed-size fallback to split oversized paragraph"
+
+    for chunk in chunks:
+        approx_tokens = len(chunk["text"].split()) / 0.75
+        assert approx_tokens <= MAX_CHUNK_TOKENS * 1.02, (
+            f"Procedure sub-chunk exceeds token limit: ~{approx_tokens:.0f} tokens"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Chunk count sanity on real file
 # ---------------------------------------------------------------------------
@@ -280,3 +304,90 @@ def test_chunk_count_reasonable_for_dumphex() -> None:
     assert result["success"] is True
     count = len(result["data"]["chunks"])
     assert 1 <= count <= 50, f"Unexpected chunk count for dumphex.cbl: {count}"
+
+
+# ---------------------------------------------------------------------------
+# file_hash propagated from preprocessor to every chunk
+# ---------------------------------------------------------------------------
+
+def test_chunk_file_attaches_file_hash() -> None:
+    """Every chunk produced by chunk_file must carry a non-empty file_hash field."""
+    result = _chunk_file(PGMOD1)
+    assert result["success"] is True
+    for chunk in result["data"]["chunks"]:
+        assert "file_hash" in chunk, "chunk must have a file_hash field"
+        assert isinstance(chunk["file_hash"], str)
+        assert len(chunk["file_hash"]) == 64, (
+            f"file_hash must be a 64-char SHA-256 hex digest, got: {chunk['file_hash']!r}"
+        )
+
+
+def test_all_chunks_from_same_file_share_file_hash() -> None:
+    """All chunks from the same source file must have the same file_hash."""
+    result = _chunk_file(PGMOD1)
+    assert result["success"] is True
+    chunks = result["data"]["chunks"]
+    hashes = {c["file_hash"] for c in chunks}
+    assert len(hashes) == 1, f"Expected one unique hash per file, found {len(hashes)}"
+
+
+# ---------------------------------------------------------------------------
+# security_flag propagated from preprocessor to every chunk
+# ---------------------------------------------------------------------------
+
+def test_chunk_file_attaches_security_flag() -> None:
+    """Every chunk produced by chunk_file must carry a security_flag bool field."""
+    result = _chunk_file(PGMOD1)
+    assert result["success"] is True
+    for chunk in result["data"]["chunks"]:
+        assert "security_flag" in chunk, "chunk must have a security_flag field"
+        assert isinstance(chunk["security_flag"], bool)
+
+
+# ---------------------------------------------------------------------------
+# parent_section fallback — top-level DATA items must get "DATA DIVISION"
+# ---------------------------------------------------------------------------
+
+def test_data_chunks_before_any_section_get_data_division_fallback() -> None:
+    """DATA items that appear with no DIVISION or SECTION header above them must get
+    parent_section='DATA DIVISION' as fallback, not an empty string.
+    This is the exact production case: current_section='' (initial) is never updated
+    before the flush, so the fallback must fire."""
+    from legacylens.ingestion.chunker import chunk_code_lines
+    # Pure data lines, no DIVISION or SECTION headers at all
+    code_lines = [
+        "       01 WS-COUNTER PIC 9(4).",
+        "       01 WS-FLAG PIC X.",
+        "       01 WS-NAME PIC X(30).",
+    ]
+    result = chunk_code_lines(code_lines, file_path="test.cbl")
+    assert result["success"] is True
+    data_chunks = [c for c in result["data"]["chunks"] if c["type"] == "DATA"]
+    assert len(data_chunks) > 0, "Expected at least one DATA chunk"
+    for chunk in data_chunks:
+        assert chunk["parent_section"] != "", (
+            "parent_section must not be empty when no section header was seen"
+        )
+        assert chunk["parent_section"] == "DATA DIVISION", (
+            f"Expected 'DATA DIVISION' fallback, got {chunk['parent_section']!r}"
+        )
+
+
+def test_data_chunks_with_explicit_section_keep_section_name() -> None:
+    """DATA chunks under an explicit WORKING-STORAGE SECTION must keep that section name;
+    the 'DATA DIVISION' fallback must not override an already-set section."""
+    from legacylens.ingestion.chunker import chunk_code_lines
+    # Only WORKING-STORAGE header and data items — section is set before data lines
+    code_lines = [
+        "       WORKING-STORAGE SECTION.",
+        "       01 WS-COUNTER PIC 9(4).",
+        "       01 WS-FLAG PIC X.",
+    ]
+    result = chunk_code_lines(code_lines, file_path="test.cbl")
+    assert result["success"] is True
+    data_chunks = [c for c in result["data"]["chunks"] if c["type"] == "DATA"]
+    assert len(data_chunks) > 0, "Expected at least one DATA chunk"
+    for chunk in data_chunks:
+        assert "WORKING-STORAGE" in chunk["parent_section"], (
+            f"Explicit WORKING-STORAGE SECTION must be preserved, got {chunk['parent_section']!r}"
+        )

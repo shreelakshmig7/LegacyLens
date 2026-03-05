@@ -8,14 +8,16 @@ Voyage AI voyage-code-2 model. Embedding is performed in batches to minimise
 API round-trips and respect rate limits.
 
 Safety guarantees:
-  - Chunks exceeding MAX_CHUNK_TOKENS are rejected before any API call is made.
-  - Failed API calls are retried up to MAX_RETRIES times with exponential backoff
-    (1s → 2s → 4s) before returning a structured error.
+  - Chunks exceeding MAX_CHUNK_TOKENS are sub-split into smaller pieces before embedding
+    so no content is ever silently dropped (zero-drop guarantee).
+  - Failed API calls and timeouts are retried up to MAX_RETRIES times with exponential
+    backoff (1s → 2s → 4s) before returning a structured error.
   - Input chunk dicts are never mutated — new dicts are returned with 'embedding' added.
   - SENSITIVE_LOG_FIELDS are filtered from any metadata that appears in log output.
 
 Key functions:
     embed_chunks(chunks) -> dict
+    _split_chunk_to_subchunks(chunk, max_tokens) -> list[dict]
     _get_voyage_client() -> voyageai.Client  (injectable for testing)
 
 Author: Shreelakshmi Gopinatha Rao
@@ -85,6 +87,48 @@ def _estimate_tokens(text: str) -> int:
 # Metadata sanitisation for safe logging
 # ---------------------------------------------------------------------------
 
+def _split_chunk_to_subchunks(
+    chunk: Dict[str, Any],
+    max_tokens: int,
+) -> List[Dict[str, Any]]:
+    """
+    Split an oversized chunk dict into sub-chunks that each fit within max_tokens.
+
+    Uses a word-window approach with the same token formula as embed_chunks pre-validation
+    (int floor of words / 0.75). All metadata fields from the original chunk are deep-copied
+    to every sub-chunk. This is the final zero-drop safety net — called only when a chunk
+    survives the chunker but is still detected as oversized at embedding time.
+
+    Args:
+        chunk:      Original chunk dict with at minimum a "text" key.
+        max_tokens: Token ceiling per sub-chunk (same units as _estimate_tokens).
+
+    Returns:
+        list[dict]: One or more sub-chunk dicts, each estimated within max_tokens.
+                    Returns a single-element list if the text is already within limit.
+    """
+    text = chunk.get("text", "")
+    words = text.split()
+
+    if not words:
+        return [chunk]
+
+    # Inverse of int(words / 0.75): max word count per part that keeps tokens under limit.
+    max_words_per_part = max(1, int(max_tokens * 0.75))
+
+    if len(words) <= max_words_per_part:
+        return [chunk]
+
+    sub_chunks: List[Dict[str, Any]] = []
+    for start in range(0, len(words), max_words_per_part):
+        part_words = words[start : start + max_words_per_part]
+        new_chunk = copy.deepcopy(chunk)
+        new_chunk["text"] = " ".join(part_words)
+        sub_chunks.append(new_chunk)
+
+    return sub_chunks
+
+
 def _safe_log_chunk(chunk: Dict[str, Any]) -> dict:
     """
     Return a copy of a chunk dict with SENSITIVE_LOG_FIELDS removed.
@@ -135,13 +179,15 @@ def _embed_batch_with_retry(client, texts: List[str]) -> List[List[float]]:
             return response.embeddings
         except concurrent.futures.TimeoutError as exc:
             last_exc = exc
+            wait = 2 ** attempt
             logger.warning(
-                "Embedding API timeout after %ds on attempt %d/%d — retrying",
+                "Embedding API timeout after %ds on attempt %d/%d — retrying in %ds",
                 timeout_sec,
                 attempt + 1,
                 MAX_RETRIES,
+                wait,
             )
-            # No sleep on timeout; retry immediately (total wall time still bounded per attempt)
+            time.sleep(wait)
         except Exception as exc:
             last_exc = exc
             wait = 2 ** attempt
@@ -220,28 +266,32 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> dict:
             "error": f"Voyage AI client error: {str(exc)}",
         }
 
-    # ── Step 1: token pre-validation ─────────────────────────────────────────
+    # ── Step 1: token pre-validation + zero-drop sub-splitting ───────────────
+    # Oversized chunks are sub-split into valid pieces instead of discarded.
+    # This guarantees 100% content coverage regardless of upstream chunker edge cases.
     valid_chunks: List[Dict[str, Any]] = []
-    skipped = 0
+    subsplit_count = 0
 
     for chunk in chunks:
         token_count = _estimate_tokens(chunk.get("text", ""))
         if token_count > MAX_CHUNK_TOKENS:
             logger.warning(
-                "Skipping oversized chunk (~%d tokens > %d limit) in %s para=%s",
+                "Sub-splitting oversized chunk (~%d tokens > %d limit) in %s para=%s",
                 token_count,
                 MAX_CHUNK_TOKENS,
                 chunk.get("file_path", "unknown"),
                 chunk.get("paragraph_name", ""),
             )
-            skipped += 1
+            sub_chunks = _split_chunk_to_subchunks(chunk, MAX_CHUNK_TOKENS)
+            valid_chunks.extend(sub_chunks)
+            subsplit_count += 1
         else:
             valid_chunks.append(chunk)
 
     if not valid_chunks:
         return {
             "success": True,
-            "data": {"chunks": [], "embedded_count": 0, "skipped_count": skipped},
+            "data": {"chunks": [], "embedded_count": 0, "skipped_count": 0, "subsplit_count": 0},
             "error": None,
         }
 
@@ -311,9 +361,9 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> dict:
         }
 
     logger.info(
-        "Embedding complete: %d embedded, %d skipped",
+        "Embedding complete: %d embedded, %d chunks sub-split (zero dropped)",
         len(embedded_chunks),
-        skipped,
+        subsplit_count,
     )
 
     return {
@@ -321,7 +371,8 @@ def embed_chunks(chunks: List[Dict[str, Any]]) -> dict:
         "data": {
             "chunks": embedded_chunks,
             "embedded_count": len(embedded_chunks),
-            "skipped_count": skipped,
+            "skipped_count": 0,        # maintained for backward compat; sub-splitting replaced skipping
+            "subsplit_count": subsplit_count,
         },
         "error": None,
     }

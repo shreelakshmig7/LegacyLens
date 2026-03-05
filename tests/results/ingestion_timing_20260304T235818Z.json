@@ -1,0 +1,11 @@
+{
+  "run_at": "2026-03-04T23:58:18.551662+00:00",
+  "stages": {
+    "discovery_s": 0.25,
+    "preprocess_chunk_s": 1.21,
+    "dependency_scrape_s": 0.54,
+    "embedding_s": 466.97,
+    "vector_store_s": 16.79,
+    "total_s": 485.75
+  }
+}

@@ -1,0 +1,23 @@
+LegacyLens Eval — 20260304T230236Z
+Total: 6
+Retrieval Precision: 2/6 (33.3%) — target >70%
+Answer Faithfulness: 4/6 (66.7%) — target >70%
+Latency Gate (3.0s): FAIL
+  LATENCY WARN: ll-001 exceeded latency gate: 5.79s > 3.0s
+  LATENCY WARN: ll-002 exceeded latency gate: 6.58s > 3.0s
+  LATENCY WARN: ll-003 exceeded latency gate: 9.09s > 3.0s
+  LATENCY WARN: ll-004 exceeded latency gate: 11.13s > 3.0s
+  LATENCY WARN: ll-006 exceeded latency gate: 6.61s > 3.0s
+
+[ret FAIL / ans PASS] ll-001
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/games/star_trek/ctrek.cob', 'paragraph_name': ''}]
+[ret PASS / ans PASS] ll-002
+[ret PASS / ans FAIL] ll-003
+  answer forbidden: ['file path', 'line number']
+[ret FAIL / ans PASS] ll-004
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/tools/JC-SQL-Precompiler/presql2.cbl', 'paragraph_name': ''}]
+[ret FAIL / ans FAIL] ll-005
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/PGMOD1.cbl', 'paragraph_name': ''}]
+  answer missing: ['CALL']
+[ret FAIL / ans PASS] ll-006
+  retrieval missing: [{'file_path': 'data/gnucobol-contrib/samples/DBsample/PostgreSQL/example1/STATETXT.cpy', 'paragraph_name': ''}]

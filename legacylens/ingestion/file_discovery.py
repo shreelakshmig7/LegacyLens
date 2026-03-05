@@ -142,6 +142,7 @@ def discover_files(repo_path: str) -> dict:
                 continue
             seen_resolved.add(resolved_str)
             discovered.append(resolved)
+            logger.debug("Discovered: %s", candidate.relative_to(base))
 
         total_lines = sum(_count_lines(f) for f in discovered)
         file_list = [str(f) for f in sorted(discovered)]
