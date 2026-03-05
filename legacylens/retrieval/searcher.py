@@ -23,11 +23,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from legacylens.config.constants import (
     BM25_FALLBACK_THRESHOLD,
     CHROMA_GET_ALL_LIMIT,
+    EMBEDDING_MODEL,
     MIN_RELEVANCE_THRESHOLD,
+    QUERY_EMBED_TIMEOUT_SECONDS,
     TOP_K,
     TOP_K_COMPOUND,
 )
-from legacylens.ingestion.embedder import embed_chunks
 from legacylens.retrieval.query_processor import detect_program, process_query
 from legacylens.retrieval.vector_store import _get_collection, query_similar
 
@@ -36,6 +37,35 @@ logger = logging.getLogger(__name__)
 _PARAGRAPH_QUERY_SIGNALS = frozenset({
     "paragraph", "section", "procedure", "what does", "explain",
 })
+
+
+def _embed_query(text: str) -> List[float]:
+    """
+    Embed a single query string using Voyage AI directly.
+
+    Bypasses the batch ingestion pipeline (ThreadPoolExecutor, retry sleeps,
+    60s timeout) in favour of a direct API call with a tight query-time timeout.
+    On any failure the caller falls back to BM25 immediately rather than waiting
+    for retries — fast failure is preferable at query time.
+
+    Args:
+        text: The normalised query string to embed.
+
+    Returns:
+        List[float]: A 1536-dimensional embedding vector.
+
+    Raises:
+        Exception: Any Voyage AI client or network error; caller handles fallback.
+    """
+    import voyageai
+
+    client = voyageai.Client(
+        api_key=os.getenv("VOYAGE_API_KEY"),
+        timeout=QUERY_EMBED_TIMEOUT_SECONDS,
+    )
+    response = client.embed([text], model=EMBEDDING_MODEL)
+    return response.embeddings[0]
+
 
 # Lazy BM25 state: (corpus_tokens, documents, metadatas, bm25_index)
 _bm25_state: Optional[Tuple[List[List[str]], List[str], List[Dict[str, Any]], Any]] = None
@@ -293,68 +323,63 @@ def search(query: str, top_k: int = TOP_K) -> dict:
 
         results: List[Dict[str, Any]] = []
 
-        # Embed query (single chunk)
-        embed_result = embed_chunks([{"text": normalized}])
-        if not embed_result["success"]:
+        try:
+            query_vector = _embed_query(normalized)
+        except Exception as exc:
             logger.warning(
-                "Query embedding failed, falling back to BM25-only retrieval: %s",
-                embed_result.get("error", "Embedding failed"),
+                "Query embedding failed, falling back to BM25-only retrieval: %s", exc
             )
             bm25_results = _bm25_search(normalized, top_k=top_k)
             results = _filter_bm25_by_program(bm25_results, program_filter)
+            return {"success": True, "data": {"results": results}, "error": None}
 
-        elif not (embed_result["data"]["chunks"]) or "embedding" not in embed_result["data"]["chunks"][0]:
-            return {"success": False, "data": None, "error": "No query embedding returned"}
+        retrieval_mode = os.getenv("LEGACYLENS_RETRIEVAL_MODE", "hybrid").strip().lower()
+
+        if retrieval_mode == "bm25":
+            logger.info("Retrieval mode=BM25 (eval baseline)")
+            bm25_results = _bm25_search(normalized, top_k=top_k)
+            results = _filter_bm25_by_program(bm25_results, program_filter)
 
         else:
-            query_vector = embed_result["data"]["chunks"][0]["embedding"]
-            retrieval_mode = os.getenv("LEGACYLENS_RETRIEVAL_MODE", "hybrid").strip().lower()
+            sim_result = query_similar(query_vector, top_k=top_k, filters=chroma_filters)
 
-            if retrieval_mode == "bm25":
-                logger.info("Retrieval mode=BM25 (eval baseline)")
+            if not sim_result["success"]:
+                return {
+                    "success": False,
+                    "data": None,
+                    "error": sim_result.get("error", "Similarity search failed"),
+                }
+
+            results = sim_result["data"]["results"]
+
+            if not results and chroma_filters and "type" in chroma_filters:
+                relaxed = dict(chroma_filters)
+                relaxed.pop("type", None)
+                relaxed_result = query_similar(query_vector, top_k=top_k, filters=relaxed or None)
+                if relaxed_result.get("success"):
+                    results = (relaxed_result.get("data") or {}).get("results") or []
+
+            if retrieval_mode != "vector_only" and _should_trigger_bm25(results):
+                max_score = _max_result_score(results)
+                logger.info(
+                    "Similarity returned %d results (max score=%.3f, threshold=%.2f), triggering BM25 fallback",
+                    len(results),
+                    max_score,
+                    MIN_RELEVANCE_THRESHOLD,
+                )
                 bm25_results = _bm25_search(normalized, top_k=top_k)
                 results = _filter_bm25_by_program(bm25_results, program_filter)
 
-            else:
-                sim_result = query_similar(query_vector, top_k=top_k, filters=chroma_filters)
-
-                if not sim_result["success"]:
-                    return {
-                        "success": False,
-                        "data": None,
-                        "error": sim_result.get("error", "Similarity search failed"),
-                    }
-
-                results = sim_result["data"]["results"]
-
-                if not results and chroma_filters and "type" in chroma_filters:
-                    relaxed = dict(chroma_filters)
-                    relaxed.pop("type", None)
-                    relaxed_result = query_similar(query_vector, top_k=top_k, filters=relaxed or None)
-                    if relaxed_result.get("success"):
-                        results = (relaxed_result.get("data") or {}).get("results") or []
-
-                if retrieval_mode != "vector_only" and _should_trigger_bm25(results):
-                    max_score = _max_result_score(results)
-                    logger.info(
-                        "Similarity returned %d results (max score=%.3f, threshold=%.2f), triggering BM25 fallback",
-                        len(results),
-                        max_score,
-                        MIN_RELEVANCE_THRESHOLD,
-                    )
-                    bm25_results = _bm25_search(normalized, top_k=top_k)
-                    results = _filter_bm25_by_program(bm25_results, program_filter)
-
-                if program_filter and not results:
-                    logger.info(
-                        "Program filter '%s' returned 0 results — falling back to global search",
-                        program_filter,
-                    )
-                    global_sim = query_similar(query_vector, top_k=top_k, filters=None)
-                    if global_sim["success"]:
-                        results = global_sim["data"]["results"]
-                    if _should_trigger_bm25(results):
-                        results = _bm25_search(normalized, top_k=top_k)
+            if program_filter and not results:
+                logger.info(
+                    "Program filter '%s' returned 0 results — falling back to global search",
+                    program_filter,
+                )
+                global_sim = query_similar(query_vector, top_k=top_k, filters=None)
+                if global_sim["success"]:
+                    results = global_sim["data"]["results"]
+                if _should_trigger_bm25(results):
+                    results = _bm25_search(normalized, top_k=top_k)
 
         # Paragraph-name metadata lookup: when the query explicitly names a
         # paragraph, fetch matching chunks directly so they are never lost to

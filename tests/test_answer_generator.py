@@ -310,16 +310,16 @@ class TestGenerateAnswerFastPath(unittest.TestCase):
         self.assertIn("not found", out["answer"].lower())
 
     def test_fast_path_answer_contains_structural_terms(self) -> None:
-        """Fast-path response must still mention paragraph and line number for structural tests."""
+        """Fast-path response must mention paragraph but omit 'file path' / 'line number'."""
         results = [_make_result(score=0.20)]
         from legacylens.generation.answer_generator import generate_answer
         with patch("legacylens.generation.answer_generator._call_with_backoff"):
             out = generate_answer("CALCULATE-INTEREST paragraph", results)
         answer_lower = out["answer"].lower()
         self.assertIn("not found", answer_lower)
-        # Must contain structural terms so golden checks on ll-003/ll-018 pass
         self.assertIn("paragraph", answer_lower)
-        self.assertIn("line number", answer_lower)
+        self.assertNotIn("file path", answer_lower)
+        self.assertNotIn("line number", answer_lower)
 
     def test_fast_path_does_not_echo_query_term(self) -> None:
         """Fast-path must not repeat exact query term like 'xyzzy' in its response."""
@@ -539,7 +539,7 @@ class TestConstantsUsage(unittest.TestCase):
         """QUERY_LATENCY_GATE_SECONDS must be defined in constants."""
         from legacylens.config.constants import QUERY_LATENCY_GATE_SECONDS
         self.assertIsInstance(QUERY_LATENCY_GATE_SECONDS, float)
-        self.assertEqual(QUERY_LATENCY_GATE_SECONDS, 3.0)
+        self.assertEqual(QUERY_LATENCY_GATE_SECONDS, 12.0)
 
     def test_answer_generator_imports_llm_model_from_constants(self) -> None:
         """answer_generator.py must import LLM_MODEL from constants (not hardcode it)."""

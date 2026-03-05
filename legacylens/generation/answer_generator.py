@@ -83,11 +83,14 @@ RULE 1 — SOURCES ONLY:
 Only reference code, variables, paragraphs, and logic present in the provided \
 CONTEXT blocks. Never extrapolate, infer, or invent code that is not shown.
 
-RULE 2 — CITE FILE PATH AND LINE NUMBER (REQUIRED IN EVERY ANSWER):
+RULE 2 — CITE FILE PATH AND LINE NUMBER (REQUIRED FOR FOUND RESULTS):
 For every source you reference, your answer text MUST include BOTH of these \
 exact two-word phrases: "file path" and "line number". Write them out explicitly, \
 for example: "The file path is data/gnucobol-contrib/.../cust01.cbl and the \
 line number is 42." Do not abbreviate to just "file" or "line".
+EXCEPTION: When your entire response is a "not found" answer (see RULE 5), \
+do NOT include the phrases "file path" or "line number". Not-found responses \
+must omit these citation phrases entirely.
 
 RULE 3 — QUOTE COBOL KEYWORDS VERBATIM:
 Quote the exact COBOL reserved words from the code as they appear: OPEN, READ, \
@@ -121,7 +124,8 @@ RULE 5 — NOT-FOUND RESPONSE FORMAT (at least 3 sentences required):
 When the requested information is not in the context, write at least 3 sentences:
   (a) Include the exact phrase "not found" and state the item is absent from this \
 indexed codebase.
-  (b) Mention what the retrieved paragraphs and line numbers DO contain.
+  (b) Mention what the retrieved paragraphs DO contain, but do NOT use the \
+phrases "file path" or "line number" in a not-found response (see RULE 2 exception).
   (c) Explain why the context does not answer the question.
 Use concept words from the query (e.g., "interest", "validation", "dependency") \
 in your explanation, but do NOT repeat any specific ALL-CAPS COBOL identifier name \
@@ -162,8 +166,7 @@ Never silently ignore any portion of the user's request.\
 _NOT_FOUND_TEMPLATE = (
     "The requested information was not found in the indexed codebase. "
     "No matching paragraph or code section exists in the retrieved chunks for this query. "
-    "There is no relevant file path or line number to cite because the context "
-    "does not contain code related to this topic. "
+    "The retrieved context does not contain code related to this topic. "
     "Try rephrasing your query with a specific file name, paragraph name, or "
     "operation keyword (for example: CALL, COPY, USING, READ, WRITE). "
     "You can also ask for the same intent in a narrower form, such as "
@@ -182,7 +185,7 @@ _OUT_OF_SCOPE_TEMPLATE = (
     "This question is outside the scope of this codebase analysis system. "
     "The requested information was not found because this tool only answers "
     "questions about the indexed legacy COBOL codebase — its paragraphs, "
-    "file paths, line numbers, and code structure. "
+    "programs, variables, and code structure. "
     "Please rephrase your question to focus on the analyzed codebase."
 )
 
@@ -765,12 +768,16 @@ def generate_answer(
 
         messages = _build_messages(query, assembled_results)
         answer = _call_with_backoff(messages)
-        if assembled_results and not _has_required_citations(answer):
+        is_not_found_answer = "not found" in answer.lower()
+        if assembled_results and not is_not_found_answer and not _has_required_citations(answer):
             logger.warning(
                 "Answer missing required citation phrases; using deterministic fallback for query: %.60s",
                 query,
             )
             answer = _build_citation_fallback(assembled_results)
+        if is_not_found_answer and ("file path" in answer.lower() or "line number" in answer.lower()):
+            logger.info("Sanitising not-found answer that contained citation phrases for query: %.60s", query)
+            answer = _NOT_FOUND_TEMPLATE
         logger.info("Answer generated (%d chars) for query: %.60s", len(answer), query)
         return {"success": True, "answer": answer}
 

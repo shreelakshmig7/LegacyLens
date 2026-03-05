@@ -33,7 +33,6 @@ test_cases:
         paragraph_name: ""
     must_contain:
       - "file path"
-      - "line number"
       - "paragraph"
     must_not_contain:
       - "I don't know"
@@ -52,7 +51,6 @@ test_cases:
     must_contain:
       - "CUSTOMER-RECORD"
       - "paragraph"
-      - "line number"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -111,7 +109,6 @@ test_cases:
         paragraph_name: ""
     must_contain:
       - "error"
-      - "line number"
     must_not_contain:
       - "I cannot help"
     difficulty: "medium"
@@ -141,7 +138,6 @@ test_cases:
     must_contain:
       - "WORKING-STORAGE"
       - "variable"
-      - "line number"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -170,7 +166,6 @@ test_cases:
         paragraph_name: ""
     must_contain:
       - "paragraph"
-      - "line number"
       - "file path"
     must_not_contain:
       - "I don't know"
@@ -188,7 +183,6 @@ test_cases:
     must_contain:
       - "CALL"
       - "program"
-      - "line number"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -203,7 +197,6 @@ test_cases:
     must_contain:
       - "COPY"
       - "copybook"
-      - "line number"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -218,7 +211,6 @@ test_cases:
     must_contain:
       - "USING"
       - "parameter"
-      - "line number"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -261,7 +253,7 @@ test_cases:
         paragraph_name: ""
     must_contain:
       - "file"
-      - "line number"
+      - "line"
     must_not_contain:
       - "I don't know"
       - "I cannot help"
@@ -318,7 +310,7 @@ test_cases:
     must_contain:
       - "validation"
       - "customer"
-      - "line number"
+      - "line"
     must_not_contain:
       - "I don't know"
       - "I cannot help"

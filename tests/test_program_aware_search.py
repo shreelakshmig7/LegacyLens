@@ -333,12 +333,8 @@ class TestSearcherBm25FallbackTrigger:
         )
         monkeypatch.setattr(
             searcher,
-            "embed_chunks",
-            lambda chunks: {
-                "success": True,
-                "data": {"chunks": [{"text": chunks[0]["text"], "embedding": [0.1, 0.2]}]},
-                "error": None,
-            },
+            "_embed_query",
+            lambda text: [0.1, 0.2],
         )
         monkeypatch.setattr(
             searcher,
@@ -387,12 +383,8 @@ class TestSearcherBm25FallbackTrigger:
         )
         monkeypatch.setattr(
             searcher,
-            "embed_chunks",
-            lambda chunks: {
-                "success": True,
-                "data": {"chunks": [{"text": chunks[0]["text"], "embedding": [0.3, 0.4]}]},
-                "error": None,
-            },
+            "_embed_query",
+            lambda text: [0.3, 0.4],
         )
         monkeypatch.setattr(
             searcher,
