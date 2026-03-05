@@ -47,6 +47,9 @@ Thumbs.db
 *.log
 logs/
 
+# ── Eval UI marker (written at runtime; do not commit) ───────────────────────
+tests/results/.latest_eval
+
 # ── Target codebase clone (ingested locally, not committed) ───────────────────
 data/
 repos/

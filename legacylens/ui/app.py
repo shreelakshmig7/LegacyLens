@@ -89,15 +89,29 @@ def _project_root() -> Path:
 
 def _find_latest_eval_file() -> Optional[Path]:
     """
-    Return path to the most recently written full 20-case eval result file.
+    Return path to the latest full 20-case eval result file.
 
-    Uses file mtime (modification time) so the file just written by Run Evals
-    is always shown after a run, regardless of filename sort or server clock.
-    Only considers files matching eval_YYYYMMDDTHHMMSSZ.txt with "Total: 20".
+    Prefers the path in tests/results/.latest_eval (written by run_eval when
+    it finishes) so the UI shows the just-run results after run and after reload.
+    Falls back to newest by mtime among eval_* files with "Total: 20".
     """
     results_dir = _project_root() / "tests" / "results"
     if not results_dir.exists():
         return None
+
+    marker = results_dir / ".latest_eval"
+    if marker.exists():
+        try:
+            name = marker.read_text(encoding="utf-8").strip()
+            if name and not Path(name).is_absolute():
+                candidate = results_dir / name
+                if candidate.exists():
+                    head = candidate.read_text(encoding="utf-8", errors="ignore")[:500]
+                    if "Total: 20" in head:
+                        return candidate
+        except Exception:
+            pass
+
     pattern = str(results_dir / "eval_*.txt")
     candidates: List[Tuple[float, Path]] = []
     for f in glob.glob(pattern):

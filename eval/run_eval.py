@@ -357,6 +357,13 @@ def run_eval(fast: bool = False) -> Dict[str, Any]:
             results_path,
         )
 
+        # Write marker so UI can show this file after run/reload (avoids mtime/clock issues)
+        _latest_marker = _RESULTS_DIR / ".latest_eval"
+        try:
+            _latest_marker.write_text(results_path.name, encoding="utf-8")
+        except Exception:
+            pass
+
         return {
             "success": retrieval_precision_pct >= 70.0 and answer_precision_pct >= 70.0,
             "total": total,
@@ -517,6 +524,11 @@ def run_eval_api(api_url: str, fast: bool = False) -> Dict[str, Any]:
             answer_passed, total, answer_precision_pct,
             "PASS" if latency_ok else "FAIL", results_path,
         )
+
+        try:
+            (_RESULTS_DIR / ".latest_eval").write_text(results_path.name, encoding="utf-8")
+        except Exception:
+            pass
 
         return {
             "success": retrieval_precision_pct >= 70.0 and answer_precision_pct >= 70.0,
