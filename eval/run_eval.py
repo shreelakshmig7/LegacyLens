@@ -131,6 +131,21 @@ def score_retrieval_precision(
             return "data/gnucobol-contrib" + abs_path.split("data/gnucobol-contrib", 1)[-1]
         return abs_path
 
+    def path_matches(exp_fp: str, res_fp: str) -> bool:
+        """True if expected and result paths refer to the same file.
+        Handles API-returned repo-relative paths (no data/gnucobol-contrib prefix)."""
+        if not exp_fp:
+            return True
+        if exp_fp == res_fp or exp_fp in res_fp or res_fp.endswith(exp_fp):
+            return True
+        # API normalizes by stripping REPO_PATH, so result may be e.g. "samples/.../file.cob"
+        # while golden expects "data/gnucobol-contrib/samples/.../file.cob"
+        if "data/gnucobol-contrib/" in exp_fp:
+            exp_suffix = exp_fp.split("data/gnucobol-contrib/", 1)[-1]
+            if res_fp == exp_suffix or res_fp.endswith(exp_suffix):
+                return True
+        return False
+
     matched = []
     missing = []
     for exp in expected:
@@ -145,7 +160,7 @@ def score_retrieval_precision(
             res_fp_raw = norm_path(meta.get("file_path") or "")
             res_fp = to_relative_path(res_fp_raw)
             res_para = norm_para(meta.get("paragraph_name") or "")
-            path_ok = (not exp_fp) or (exp_fp == res_fp or exp_fp in res_fp or res_fp.endswith(exp_fp))
+            path_ok = path_matches(exp_fp, res_fp)
             para_ok = (not exp_para) or (exp_para == res_para)
             if path_ok and para_ok:
                 found = True

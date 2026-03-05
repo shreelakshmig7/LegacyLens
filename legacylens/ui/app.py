@@ -87,17 +87,46 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
+# Baked-in eval file for deployment: commit this so the live UI shows results
+# (container has no persistent tests/results/; only files in the image are available).
+EVAL_BAKED_FILENAME = "eval_latest.txt"
+
+
 def _find_latest_eval_file() -> Optional[Path]:
     """
     Return path to the latest full 20-case eval result file.
 
-    Prefers the path in tests/results/.latest_eval (written by run_eval when
-    it finishes) so the UI shows the just-run results after run and after reload.
-    Falls back to newest by mtime among eval_* files with "Total: 20".
+    Order of precedence:
+    1. EVAL_RESULTS_FILE env (if set) — path to a specific file for deployment.
+    2. tests/results/eval_latest.txt — baked-in file committed for Railway/deploy.
+    3. tests/results/.latest_eval marker (written by run_eval when it finishes).
+    4. Newest by mtime among eval_*.txt files with "Total: 20" (local runs).
     """
     results_dir = _project_root() / "tests" / "results"
     if not results_dir.exists():
         return None
+
+    env_path = os.getenv("EVAL_RESULTS_FILE", "").strip()
+    if env_path:
+        p = Path(env_path)
+        if not p.is_absolute():
+            p = _project_root() / p
+        if p.exists():
+            try:
+                head = p.read_text(encoding="utf-8", errors="ignore")[:500]
+                if "Total: 20" in head:
+                    return p
+            except Exception:
+                pass
+
+    baked = results_dir / EVAL_BAKED_FILENAME
+    if baked.exists():
+        try:
+            head = baked.read_text(encoding="utf-8", errors="ignore")[:500]
+            if "Total: 20" in head:
+                return baked
+        except Exception:
+            pass
 
     marker = results_dir / ".latest_eval"
     if marker.exists():
