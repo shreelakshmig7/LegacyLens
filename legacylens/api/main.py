@@ -51,6 +51,7 @@ from legacylens.features.doc_generator import generate_documentation as _gen_doc
 from legacylens.generation.answer_generator import (
     _OUT_OF_SCOPE_TEMPLATE,
     _build_github_link,
+    _is_fast_path,
     _is_out_of_scope,
     _normalize_file_path,
     _parse_line_range,
@@ -313,8 +314,14 @@ def _generate_with_feature_routing(
 
 
 def _stream_query_response(sanitized: str, assembled: List[Dict[str, Any]]):
-    """Generator: one JSON line (metadata), then tokens from generate_answer_stream."""
-    meta = _build_metadata_from_assembled(assembled)
+    """Generator: one JSON line (metadata), then tokens from generate_answer_stream.
+
+    Chunks are suppressed in metadata when the fast-path applies (all relevance
+    scores below NOT_FOUND_SCORE_THRESHOLD), because those chunks are irrelevant
+    and should not be surfaced to the user as "Retrieved chunks".
+    """
+    chunks_for_meta = [] if _is_fast_path(assembled) else assembled
+    meta = _build_metadata_from_assembled(chunks_for_meta)
     yield json.dumps(meta) + "\n"
     for token in generate_answer_stream(sanitized, assembled):
         yield token
@@ -390,7 +397,8 @@ def query(request: QueryRequest):
                 "relevance_scores": meta["relevance_scores"],
             }
 
-        meta = _build_metadata_from_assembled(assembled)
+        chunks_for_meta = [] if _is_fast_path(assembled) else assembled
+        meta = _build_metadata_from_assembled(chunks_for_meta)
         return {
             "answer": gen_result.get("answer", ""),
             "chunks": meta["chunks"],
