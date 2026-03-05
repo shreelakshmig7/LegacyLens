@@ -25,6 +25,11 @@ import sys
 import zipfile
 from typing import Any, Dict, List, Set
 
+# Ensure project root is on sys.path so "import legacylens" works when run from /app (e.g. Railway).
+_app_root = pathlib.Path(__file__).resolve().parent.parent
+if str(_app_root) not in sys.path:
+    sys.path.insert(0, str(_app_root))
+
 # Load .env from project root so VOYAGE_API_KEY, OPENAI_API_KEY, etc. are set.
 try:
     from dotenv import load_dotenv
