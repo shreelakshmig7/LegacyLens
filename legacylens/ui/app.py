@@ -57,6 +57,7 @@ KEY_STREAM_ERROR = "stream_error"
 KEY_SEARCH_RAN_THIS_RUN = "_search_ran_this_run"
 KEY_SKIP_NEXT_LAST_RESULT = "_skip_next_last_result"
 KEY_SELECTED_CHUNK_INDEX = "_selected_chunk_index"  # Pre-Search 12: user selects most relevant
+KEY_EVAL_RUNNING = "_eval_running"
 
 
 def _init_session_state() -> None:
@@ -73,6 +74,8 @@ def _init_session_state() -> None:
         st.session_state[KEY_STREAM_ERROR] = None
     if KEY_SELECTED_CHUNK_INDEX not in st.session_state:
         st.session_state[KEY_SELECTED_CHUNK_INDEX] = None
+    if KEY_EVAL_RUNNING not in st.session_state:
+        st.session_state[KEY_EVAL_RUNNING] = False
     # Apply pending example before text_input is drawn (Streamlit forbids modifying query_input after widget creation)
     if KEY_PENDING_EXAMPLE in st.session_state:
         st.session_state[KEY_QUERY_INPUT] = st.session_state.pop(KEY_PENDING_EXAMPLE)
@@ -85,29 +88,46 @@ def _project_root() -> Path:
 
 
 def _find_latest_eval_file() -> Optional[Path]:
-    """Return path to the latest tests/results/eval_*.txt by timestamp in filename."""
+    """
+    Return path to the latest timestamped eval result file.
+
+    Only considers files whose name matches eval_YYYYMMDDTHHMMSSZ.txt
+    (i.e. the character after 'eval_' is a digit), to avoid picking up
+    named files like eval_staged_*, eval_pr5_*, eval_retrieval_*, etc.
+    """
     results_dir = _project_root() / "tests" / "results"
     if not results_dir.exists():
         return None
     pattern = str(results_dir / "eval_*.txt")
-    files = glob.glob(pattern)
+    files = [
+        f for f in glob.glob(pattern)
+        if Path(f).name[len("eval_"):len("eval_") + 1].isdigit()
+    ]
     if not files:
         return None
-    # Sort by filename (eval_YYYYMMDDTHHMMSSZ.txt) descending
     files.sort(reverse=True)
     return Path(files[0])
 
 
 def _parse_eval_file(path: Path) -> Dict[str, Any]:
-    """Parse eval file for retrieval precision, answer faithfulness, timestamp."""
+    """
+    Parse eval file for retrieval precision, answer faithfulness, and compact summary.
+
+    Args:
+        path: Path to the eval result .txt file.
+
+    Returns:
+        dict with keys: timestamp, retrieval_fraction, answer_fraction, summary_line, raw_lines.
+    """
     out: Dict[str, Any] = {
         "timestamp": "",
-        "retrieval_precision": "",
-        "answer_faithfulness": "",
+        "retrieval_fraction": "",
+        "answer_fraction": "",
+        "summary_line": "",
         "raw_lines": [],
     }
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except Exception:
         return out
     lines = text.strip().split("\n")
@@ -116,13 +136,20 @@ def _parse_eval_file(path: Path) -> Dict[str, Any]:
         return out
     # First line: "LegacyLens Eval — 20260304T011012Z"
     first = lines[0]
-    if "—" in first:
-        out["timestamp"] = first.split("—")[-1].strip()
+    if "\u2014" in first:
+        out["timestamp"] = first.split("\u2014")[-1].strip()
     for line in lines[1:]:
+        # "Retrieval Precision: 12/20 (60.0%) — target >70%"
         if "Retrieval Precision:" in line:
-            out["retrieval_precision"] = line.strip()
+            parts = line.split("Retrieval Precision:")
+            fraction = parts[1].strip().split()[0] if len(parts) > 1 else ""
+            out["retrieval_fraction"] = fraction
         elif "Answer Faithfulness:" in line:
-            out["answer_faithfulness"] = line.strip()
+            parts = line.split("Answer Faithfulness:")
+            fraction = parts[1].strip().split()[0] if len(parts) > 1 else ""
+            out["answer_fraction"] = fraction
+    if out["retrieval_fraction"] or out["answer_fraction"]:
+        out["summary_line"] = f"Retrieval: {out['retrieval_fraction']} · Answer: {out['answer_fraction']}"
     return out
 
 
@@ -240,7 +267,7 @@ def _run_eval_fast() -> Tuple[int, str]:
         return -1, f"Script not found: {script}"
     try:
         result = subprocess.run(
-            [sys.executable, str(script), "--fast"],
+            [sys.executable, str(script)],
             cwd=str(project_root),
             capture_output=True,
             text=True,
@@ -276,31 +303,40 @@ def _render_sidebar_about() -> None:
 
 
 def _render_sidebar_eval() -> None:
-    """Sidebar 'Evaluation' section: latest eval file, Run Eval (Fast) button, warning."""
-    st.sidebar.header("Evaluation")
+    """
+    Sidebar eval section: one-line summary from latest eval file and Run Evals button.
+
+    Button is disabled while eval is running to prevent double-clicks.
+    Status messages stay in the sidebar; main area is not affected.
+    """
     latest = _find_latest_eval_file()
     if latest:
         parsed = _parse_eval_file(latest)
-        if parsed["timestamp"]:
-            st.sidebar.caption(f"Latest: {parsed['timestamp']}")
-        if parsed["retrieval_precision"]:
-            st.sidebar.text(parsed["retrieval_precision"])
-        if parsed["answer_faithfulness"]:
-            st.sidebar.text(parsed["answer_faithfulness"])
-    else:
-        st.sidebar.caption("No eval results yet. Run eval below.")
-    st.sidebar.warning("Running eval makes live API calls and may take 2-3 minutes.")
-    if st.sidebar.button("Run Eval (Fast)", key="run_eval_btn"):
+        if parsed["summary_line"]:
+            st.sidebar.caption(parsed["summary_line"])
+
+    is_running = st.session_state.get(KEY_EVAL_RUNNING, False)
+    clicked = st.sidebar.button("Run Evals", key="run_eval_btn", disabled=is_running)
+
+    if clicked and not is_running:
+        st.session_state[KEY_EVAL_RUNNING] = True
+        st.rerun()
+
+    if is_running:
         eval_script = _project_root() / "eval" / "run_eval.py"
+        status = st.sidebar.empty()
         if not eval_script.exists():
-            st.sidebar.error("Eval not available in this deployment")
+            st.session_state[KEY_EVAL_RUNNING] = False
+            status.error("Eval script not found")
         else:
-            with st.sidebar.spinner("Running eval..."):
-                code, out = _run_eval_fast()
+            status.info("Running eval…")
+            code, out = _run_eval_fast()
+            st.session_state[KEY_EVAL_RUNNING] = False
             if code == 0:
-                st.sidebar.success("Eval completed. Refresh to see latest results.")
+                status.success("Done. Reload to refresh summary.")
             else:
-                st.sidebar.error(f"Eval failed: {out[:500]}")
+                status.error(f"Eval failed: {out[:300]}")
+            st.rerun()
 
 
 def _infer_code_language(file_path: str) -> str:
@@ -529,6 +565,10 @@ def main() -> None:
     st.set_page_config(
         page_title="LegacyLens — COBOL Codebase Explorer",
         layout="wide",
+    )
+    st.markdown(
+        "<style>[data-testid='stStatusWidget']{display:none!important}</style>",
+        unsafe_allow_html=True,
     )
     _init_session_state()
 
