@@ -89,11 +89,11 @@ def _project_root() -> Path:
 
 def _find_latest_eval_file() -> Optional[Path]:
     """
-    Return path to the latest timestamped eval result file.
+    Return path to the latest full 20-case eval result file.
 
-    Only considers files whose name matches eval_YYYYMMDDTHHMMSSZ.txt
-    (i.e. the character after 'eval_' is a digit), to avoid picking up
-    named files like eval_staged_*, eval_pr5_*, eval_retrieval_*, etc.
+    Only considers files whose name matches eval_YYYYMMDDTHHMMSSZ.txt.
+    Prefers files containing "Total: 20" (full run) so production does not
+    show a 6-case (e.g. 4/6) run as the summary.
     """
     results_dir = _project_root() / "tests" / "results"
     if not results_dir.exists():
@@ -106,6 +106,13 @@ def _find_latest_eval_file() -> Optional[Path]:
     if not files:
         return None
     files.sort(reverse=True)
+    for f in files:
+        try:
+            head = Path(f).read_text(encoding="utf-8", errors="ignore")[:500]
+            if "Total: 20" in head:
+                return Path(f)
+        except Exception:
+            continue
     return Path(files[0])
 
 
